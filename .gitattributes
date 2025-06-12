@@ -1,0 +1,21 @@
+# Set the 'rcs_keywords' filter for files with the 'text' attribute
+[attr]text filter=rcs_keywords
+
+# Automatically normalize line endings for all text files.
+# Set the 'text' attribute for all files.
+* text=auto text
+
+# While this file contains an extensive number of text and binary filename
+# patterns that should be excluded from Git smudge/clean filters, the list is
+# not comprehensive.
+#
+# Git filename patterns are case sensitive. The list provided here will only
+# match upper- or mixed-case filenames when applied on a case insensitive
+# filesystem.
+
+# Remove filters from certain types of text file
+*.csv text -filter
+*.diff text -filter
+*.eml text -filter
+*.md text -filter
+*.patch text -filter
