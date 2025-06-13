@@ -13,7 +13,7 @@
 #include <limits.h>
 #include <discid/discid.h>
 
-#define VERSION "0.0.2"
+#define VERSION "1.0.0"
 
 // Platform-specific browser opening
 #ifdef __APPLE__
