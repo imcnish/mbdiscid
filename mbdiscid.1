@@ -1,0 +1,203 @@
+.TH MBDISCID 1 "January 2025" "mbdiscid 1.0.0" "User Commands"
+.SH NAME
+mbdiscid \- calculate disc IDs from CD or CDTOC data
+.SH SYNOPSIS
+.B mbdiscid
+[\fB\-a\fR|\fB\-r\fR] [\fB\-o\fR] \fIDEVICE\fR
+.br
+.B mbdiscid
+[\fB\-i\fR|\fB\-t\fR|\fB\-T\fR|\fB\-u\fR] [\fB\-F\fR|\fB\-M\fR] [\fB\-o\fR] \fIDEVICE\fR
+.br
+.B mbdiscid
+[\fB\-i\fR|\fB\-t\fR|\fB\-T\fR|\fB\-u\fR] [\fB\-F\fR|\fB\-M\fR] [\fB\-o\fR] \fB\-c\fR \fIFIRST\fR \fILAST\fR \fIOFFSET\fR... \fILEADOUT\fR
+.br
+.B mbdiscid
+[\fB\-i\fR|\fB\-t\fR|\fB\-T\fR|\fB\-u\fR] [\fB\-F\fR|\fB\-M\fR] [\fB\-o\fR] \fB\-c\fR
+.SH DESCRIPTION
+.B mbdiscid
+calculates disc IDs for audio CDs using either the MusicBrainz or FreeDB/CDDB
+algorithms. It can read directly from a CD device or calculate from provided
+CDTOC (CD Table of Contents) data.
+.PP
+The program supports both MusicBrainz disc IDs (base64-encoded SHA-1 hash) and
+FreeDB/CDDB disc IDs (8-digit hexadecimal). By default,
+.B mbdiscid
+operates in
+MusicBrainz mode.
+.SH OPTIONS
+.SS Mode Options
+.TP
+.BR \-F ", " \-\-freedb
+Use FreeDB/CDDB mode for disc ID calculation.
+.TP
+.BR \-M ", " \-\-musicbrainz
+Use MusicBrainz mode (default).
+.SS Action Options
+.TP
+.BR \-a ", " \-\-all
+Display all information (both FreeDB and MusicBrainz formats).
+.TP
+.BR \-r ", " \-\-raw
+Display raw TOC data.
+.TP
+.BR \-i ", " \-\-id
+Display disc ID (default).
+.TP
+.BR \-t ", " \-\-toc
+Display TOC.
+.TP
+.BR \-T ", " \-\-id\-toc
+Display both disc ID and TOC.
+.TP
+.BR \-u ", " \-\-url
+Display submission URL (MusicBrainz mode only).
+.TP
+.BR \-o ", " \-\-open
+Open submission URL in web browser (MusicBrainz mode only).
+Can be combined with other action options.
+.SS Other Options
+.TP
+.BR \-c ", " \-\-calculate
+Calculate from CDTOC data.
+.TP
+.BR \-h ", " \-\-help
+Display help message and exit.
+.TP
+.BR \-v ", " \-\-version
+Display version information and exit.
+.SH ARGUMENTS
+.TP
+.I DEVICE
+CD device path (e.g., /dev/cdrom on Linux, /dev/rdisk16 on Darwin).
+.TP
+.I FIRST
+First track number (usually 1).
+.TP
+.I LAST
+Last track number.
+.TP
+.I OFFSET
+Track offset in CD frames (1/75 second).
+.TP
+.I LEADOUT
+Leadout track offset.
+.SH EXAMPLES
+.SS Reading from CD device
+.TP
+.B mbdiscid /dev/cdrom
+Display MusicBrainz disc ID.
+.TP
+.B mbdiscid \-F /dev/cdrom
+Display FreeDB disc ID.
+.TP
+.B mbdiscid \-T /dev/cdrom
+Display MusicBrainz disc ID and TOC.
+.TP
+.B mbdiscid \-u \-o /dev/cdrom
+Display submission URL and open it in browser.
+.SS Calculating from CDTOC data
+.TP
+.B mbdiscid \-c 1 12 150 17477 32100 47997 67160 84650 93732 110667 127377 147860 160437 183097 198592
+Calculate disc ID from CDTOC data (12 tracks).
+.TP
+.B echo "1 12 150 17477 32100 47997 67160 84650 93732 110667 127377 147860 160437 183097 198592" | mbdiscid \-c
+Calculate disc ID from CDTOC data via stdin.
+.TP
+.B mbdiscid \-c < cdtoc.txt
+Calculate disc ID from CDTOC data in a file.
+.TP
+.B mbdiscid \-F \-T \-c 1 5 150 23437 45102 62385 79845 98450
+Calculate and display FreeDB disc ID and TOC for a 5-track disc.
+.SH OUTPUT FORMATS
+.SS Disc IDs
+.TP
+MusicBrainz:
+Base64-encoded SHA-1 hash (e.g., P7q3qFvH7y8g5BJO0RcLJjZ5OB8-)
+.TP
+FreeDB:
+8-digit hexadecimal (e.g., a50b5e0c)
+.SS TOC Formats
+The TOC output format differs between modes:
+.TP
+Raw (\fB\-r\fR):
+.I first last offset1 offset2 ... offsetN leadout
+.br
+All values in CD frames. This format shows the complete disc layout.
+.TP
+MusicBrainz (\fB\-t\fR in MusicBrainz mode):
+.I first last offset1 offset2 ... offsetN leadout
+.br
+Identical to raw format. All values in CD frames.
+.TP
+FreeDB (\fB\-t\fR in FreeDB mode):
+.I track_count offset1 offset2 ... offsetN total_seconds
+.br
+Shows number of tracks, offsets in frames, and total playing time in seconds.
+.SS Complete Examples
+.TP
+MusicBrainz ID only (\fB\-i\fR):
+P7q3qFvH7y8g5BJO0RcLJjZ5OB8-
+.TP
+MusicBrainz TOC only (\fB\-t\fR):
+1 12 150 17477 32100 47997 67160 84650 93732 110667 127377 147860 160437 183097 198592
+.TP
+MusicBrainz ID and TOC (\fB\-T\fR):
+P7q3qFvH7y8g5BJO0RcLJjZ5OB8- 1 12 150 17477 32100 47997 67160 84650 93732 110667 127377 147860 160437 183097 198592
+.TP
+FreeDB ID only (\fB\-i\fR):
+a50b5e0c
+.TP
+FreeDB TOC only (\fB\-t\fR):
+12 150 17477 32100 47997 67160 84650 93732 110667 127377 147860 160437 183097 2647
+.TP
+FreeDB ID and TOC (\fB\-T\fR):
+a50b5e0c 12 150 17477 32100 47997 67160 84650 93732 110667 127377 147860 160437 183097 2647
+.SH EXIT STATUS
+.TP
+.B 0
+Success (EX_OK)
+.TP
+.B 64
+Command line usage error (EX_USAGE)
+.TP
+.B 65
+Data format error (EX_DATAERR)
+.TP
+.B 66
+Cannot open input (EX_NOINPUT)
+.TP
+.B 69
+Service unavailable (EX_UNAVAILABLE)
+.TP
+.B 70
+Internal software error (EX_SOFTWARE)
+.TP
+.B 71
+System error (EX_OSERR)
+.SH NOTES
+.IP \(bu 2
+FreeDB was discontinued in 2020 and is no longer accepting submissions.
+.IP \(bu 2
+URL operations (\fB\-u\fR, \fB\-o\fR) are only supported for MusicBrainz mode.
+.IP \(bu 2
+Track offsets are specified in CD frames, where 75 frames = 1 second.
+.IP \(bu 2
+CDTOC data can be provided on command line or via stdin when using \fB\-c\fR.
+.IP \(bu 2
+On Darwin, block device paths (e.g., /dev/disk16) may not be accessible even with
+sudo. Use raw device paths (e.g., /dev/rdisk16) instead.
+.SH SEE ALSO
+.BR cd-discid (1),
+.BR cdparanoia (1)
+.PP
+MusicBrainz: https://musicbrainz.org/
+.br
+libdiscid: https://musicbrainz.org/doc/libdiscid
+.SH AUTHOR
+Written by [Your Name].
+.SH COPYRIGHT
+Copyright \(co 2025 Ian McNish.
+License: MIT
+.br
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
