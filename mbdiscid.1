@@ -1,74 +1,76 @@
-.TH MBDISCID 1 "January 2025" "mbdiscid 1.0.0" "User Commands"
+.TH MBDISCID 1 "December 2025" "mbdiscid 1.0.3" "User Commands"
 .SH NAME
 mbdiscid \- calculate disc IDs from CD or CDTOC data
 .SH SYNOPSIS
 .B mbdiscid
-[\fB\-a\fR|\fB\-r\fR] [\fB\-o\fR] \fIDEVICE\fR
+[\fB\-ACFIMa\fR] [\fB\-itu\fR] [\fB\-o\fR] [\fB\-q\fR] \fIDEVICE\fR
 .br
 .B mbdiscid
-[\fB\-i\fR|\fB\-t\fR|\fB\-T\fR|\fB\-u\fR] [\fB\-F\fR|\fB\-M\fR] [\fB\-o\fR] \fIDEVICE\fR
+[\fB\-AFMa\fR] [\fB\-itu\fR] [\fB\-o\fR] [\fB\-q\fR] \fB\-c\fR \fIFIRST\fR \fILAST\fR \fIOFFSET\fR... \fILEADOUT\fR
 .br
 .B mbdiscid
-[\fB\-i\fR|\fB\-t\fR|\fB\-T\fR|\fB\-u\fR] [\fB\-F\fR|\fB\-M\fR] [\fB\-o\fR] \fB\-c\fR \fIFIRST\fR \fILAST\fR \fIOFFSET\fR... \fILEADOUT\fR
-.br
-.B mbdiscid
-[\fB\-i\fR|\fB\-t\fR|\fB\-T\fR|\fB\-u\fR] [\fB\-F\fR|\fB\-M\fR] [\fB\-o\fR] \fB\-c\fR
+[\fB\-AFMa\fR] [\fB\-itu\fR] [\fB\-o\fR] [\fB\-q\fR] \fB\-c\fR
 .SH DESCRIPTION
 .B mbdiscid
-calculates disc IDs for audio CDs using either the MusicBrainz or FreeDB/CDDB
-algorithms. It can read directly from a CD device or calculate from provided
-CDTOC (CD Table of Contents) data.
+calculates disc IDs for audio CDs using multiple algorithms: MusicBrainz,
+FreeDB/CDDB, and AccurateRip. It can also extract the Media Catalog Number (MCN)
+and International Standard Recording Codes (ISRCs) from physical discs.
 .PP
-The program supports both MusicBrainz disc IDs (base64-encoded SHA-1 hash) and
-FreeDB/CDDB disc IDs (8-digit hexadecimal). By default,
-.B mbdiscid
-operates in
-MusicBrainz mode.
+The program can read directly from a CD device or calculate from provided
+CDTOC (CD Table of Contents) data.
 .SH OPTIONS
 .SS Mode Options
+Mode options are mutually exclusive unless using \fB\-a\fR.
+.TP
+.BR \-A ", " \-\-accuraterip
+AccurateRip mode.
+.TP
+.BR \-C ", " \-\-catalog
+Media Catalog Number (MCN/UPC/EAN) mode. Requires physical disc.
 .TP
 .BR \-F ", " \-\-freedb
-Use FreeDB/CDDB mode for disc ID calculation.
+FreeDB/CDDB mode.
+.TP
+.BR \-I ", " \-\-isrc
+ISRC (International Standard Recording Code) mode. Requires physical disc.
 .TP
 .BR \-M ", " \-\-musicbrainz
-Use MusicBrainz mode (default).
-.SS Action Options
+MusicBrainz mode. This is the default when an action is specified without a mode.
 .TP
 .BR \-a ", " \-\-all
-Display all information (both FreeDB and MusicBrainz formats).
-.TP
-.BR \-r ", " \-\-raw
-Display raw TOC data.
+All modes and actions. This is the default when no options are specified.
+.SS Action Options
+Action options can be combined.
 .TP
 .BR \-i ", " \-\-id
-Display disc ID (default).
+Display disc ID. This is the default when a mode is specified without an action.
 .TP
 .BR \-t ", " \-\-toc
-Display TOC.
-.TP
-.BR \-T ", " \-\-id\-toc
-Display both disc ID and TOC.
+Display TOC (Table of Contents).
 .TP
 .BR \-u ", " \-\-url
-Display submission URL (MusicBrainz mode only).
+Display verification URL (MusicBrainz mode only).
 .TP
 .BR \-o ", " \-\-open
-Open submission URL in web browser (MusicBrainz mode only).
-Can be combined with other action options.
+Open verification URL in web browser (MusicBrainz mode only).
 .SS Other Options
 .TP
 .BR \-c ", " \-\-calculate
-Calculate from CDTOC data.
+Calculate from CDTOC data instead of reading from a device.
+Cannot be used with \fB\-C\fR or \fB\-I\fR modes.
+.TP
+.BR \-q ", " \-\-quiet
+Suppress error messages. Useful for scripting.
 .TP
 .BR \-h ", " \-\-help
 Display help message and exit.
 .TP
-.BR \-v ", " \-\-version
-Display version information and exit.
+.BR \-V ", " \-\-version
+Display version information (including libdiscid version) and exit.
 .SH ARGUMENTS
 .TP
 .I DEVICE
-CD device path (e.g., /dev/cdrom on Linux, /dev/rdisk16 on Darwin).
+CD device path (e.g., /dev/rdisk16 on macOS, /dev/sr0 on Linux).
 .TP
 .I FIRST
 First track number (usually 1).
@@ -77,81 +79,98 @@ First track number (usually 1).
 Last track number.
 .TP
 .I OFFSET
-Track offset in CD frames (1/75 second).
+Track offset in CD frames (75 frames = 1 second).
 .TP
 .I LEADOUT
 Leadout track offset.
+.SH DISC ID FORMATS
+.TP
+MusicBrainz:
+Base64-encoded SHA-1 hash (e.g., m.wjLfLe7XrMz1c_iAL6qo06Q4w-)
+.TP
+FreeDB/CDDB:
+8-digit hexadecimal (e.g., e00dbc11)
+.TP
+AccurateRip:
+Format: NNN-XXXXXXXX-YYYYYYYY-ZZZZZZZZ where NNN is track count,
+XXXXXXXX is DiscID1, YYYYYYYY is DiscID2, and ZZZZZZZZ is the CDDB ID.
+(e.g., 017-00231e4f-01bf54d7-e00dbc11)
+.SH TOC FORMATS
+.TP
+MusicBrainz:
+.I first last offset1 offset2 ... offsetN leadout
+.br
+All values in CD frames.
+.TP
+FreeDB:
+.I track_count offset1 offset2 ... offsetN total_seconds
+.br
+Total time in seconds instead of leadout.
+.TP
+AccurateRip:
+.I track_count offset1 offset2 ... offsetN leadout
+.br
+All values in CD frames.
 .SH EXAMPLES
 .SS Reading from CD device
 .TP
-.B mbdiscid /dev/cdrom
-Display MusicBrainz disc ID.
+.B mbdiscid /dev/rdisk16
+Display all information (default).
 .TP
-.B mbdiscid \-F /dev/cdrom
-Display FreeDB disc ID.
+.B mbdiscid \-M /dev/rdisk16
+Display MusicBrainz disc ID only.
 .TP
-.B mbdiscid \-T /dev/cdrom
-Display MusicBrainz disc ID and TOC.
+.B mbdiscid \-Mtu /dev/rdisk16
+Display MusicBrainz TOC and URL.
 .TP
-.B mbdiscid \-u \-o /dev/cdrom
-Display submission URL and open it in browser.
+.B mbdiscid \-C /dev/rdisk16
+Display Media Catalog Number (MCN).
+.TP
+.B mbdiscid \-I /dev/rdisk16
+Display ISRCs for all tracks.
+.TP
+.B mbdiscid \-Mo /dev/rdisk16
+Open MusicBrainz verification URL in browser.
 .SS Calculating from CDTOC data
 .TP
 .B mbdiscid \-c 1 12 150 17477 32100 47997 67160 84650 93732 110667 127377 147860 160437 183097 198592
-Calculate disc ID from CDTOC data (12 tracks).
+Calculate disc IDs from CDTOC data (12 tracks).
 .TP
-.B echo "1 12 150 17477 32100 47997 67160 84650 93732 110667 127377 147860 160437 183097 198592" | mbdiscid \-c
-Calculate disc ID from CDTOC data via stdin.
+.B echo "1 12 150 17477 ..." | mbdiscid \-c
+Calculate from CDTOC data via stdin.
 .TP
-.B mbdiscid \-c < cdtoc.txt
-Calculate disc ID from CDTOC data in a file.
+.B mbdiscid \-Ft \-c 1 5 150 23437 45102 62385 79845 98450
+Calculate and display FreeDB TOC for a 5-track disc.
+.SS Scripting
 .TP
-.B mbdiscid \-F \-T \-c 1 5 150 23437 45102 62385 79845 98450
-Calculate and display FreeDB disc ID and TOC for a 5-track disc.
-.SH OUTPUT FORMATS
-.SS Disc IDs
-.TP
-MusicBrainz:
-Base64-encoded SHA-1 hash (e.g., P7q3qFvH7y8g5BJO0RcLJjZ5OB8-)
-.TP
-FreeDB:
-8-digit hexadecimal (e.g., a50b5e0c)
-.SS TOC Formats
-The TOC output format differs between modes:
-.TP
-Raw (\fB\-r\fR):
-.I first last offset1 offset2 ... offsetN leadout
-.br
-All values in CD frames. This format shows the complete disc layout.
-.TP
-MusicBrainz (\fB\-t\fR in MusicBrainz mode):
-.I first last offset1 offset2 ... offsetN leadout
-.br
-Identical to raw format. All values in CD frames.
-.TP
-FreeDB (\fB\-t\fR in FreeDB mode):
-.I track_count offset1 offset2 ... offsetN total_seconds
-.br
-Shows number of tracks, offsets in frames, and total playing time in seconds.
-.SS Complete Examples
-.TP
-MusicBrainz ID only (\fB\-i\fR):
-P7q3qFvH7y8g5BJO0RcLJjZ5OB8-
-.TP
-MusicBrainz TOC only (\fB\-t\fR):
-1 12 150 17477 32100 47997 67160 84650 93732 110667 127377 147860 160437 183097 198592
-.TP
-MusicBrainz ID and TOC (\fB\-T\fR):
-P7q3qFvH7y8g5BJO0RcLJjZ5OB8- 1 12 150 17477 32100 47997 67160 84650 93732 110667 127377 147860 160437 183097 198592
-.TP
-FreeDB ID only (\fB\-i\fR):
-a50b5e0c
-.TP
-FreeDB TOC only (\fB\-t\fR):
-12 150 17477 32100 47997 67160 84650 93732 110667 127377 147860 160437 183097 2647
-.TP
-FreeDB ID and TOC (\fB\-T\fR):
-a50b5e0c 12 150 17477 32100 47997 67160 84650 93732 110667 127377 147860 160437 183097 2647
+.B mcn=$(mbdiscid \-Cq /dev/rdisk16) || mcn=""
+Get MCN silently, defaulting to empty string on failure.
+.SH OUTPUT FORMAT
+When using \fB\-a\fR (all), output is organized by mode with headers:
+.PP
+.nf
+----- MCN -----
+0724349532625
+
+----- ISRC -----
+1: GBAYE6700012
+2: GBAYE6700013
+
+----- AccurateRip -----
+17 150 19745 32575 ... 263855
+017-00231e4f-01bf54d7-e00dbc11
+
+----- FreeDB -----
+17 150 19745 32575 ... 3518
+e00dbc11
+
+----- MusicBrainz -----
+1 17 150 19745 32575 ... 263855
+m.wjLfLe7XrMz1c_iAL6qo06Q4w-
+https://musicbrainz.org/cdtoc/attach?id=...
+.fi
+.PP
+Sections with no available data are omitted.
 .SH EXIT STATUS
 .TP
 .B 0
@@ -178,14 +197,74 @@ System error (EX_OSERR)
 .IP \(bu 2
 FreeDB was discontinued in 2020 and is no longer accepting submissions.
 .IP \(bu 2
-URL operations (\fB\-u\fR, \fB\-o\fR) are only supported for MusicBrainz mode.
+URL and open options (\fB\-u\fR, \fB\-o\fR) are only supported for MusicBrainz mode.
+.IP \(bu 2
+MCN (\fB\-C\fR) and ISRC (\fB\-I\fR) require reading from a physical disc and
+cannot be used with \fB\-c\fR (calculate mode).
 .IP \(bu 2
 Track offsets are specified in CD frames, where 75 frames = 1 second.
 .IP \(bu 2
 CDTOC data can be provided on command line or via stdin when using \fB\-c\fR.
 .IP \(bu 2
-On Darwin, block device paths (e.g., /dev/disk16) may not be accessible even with
-sudo. Use raw device paths (e.g., /dev/rdisk16) instead.
+On macOS, use raw device paths (e.g., /dev/rdisk16) instead of block devices.
+.IP \(bu 2
+Not all CDs contain MCN or ISRC data.
+.IP \(bu 2
+ISRC reading uses direct MMC commands as a fallback when libdiscid returns
+incomplete data, improving reliability especially for track 1.
+.SH ISRC DETECTION STRATEGY
+Reading ISRCs from audio CDs presents several reliability challenges that vary by
+drive, disc, and operating system. Testing across 6 drives, 12 discs, and 2 operating
+systems (Linux and macOS) revealed the following:
+.SS Observed Issues
+.IP "\fBTrack 1 failures:\fR"
+Some drives exhibit ~90% first-read failure rates on track 1, while other drives
+work reliably. The root cause is not fully understood, but may be related to drive
+timing or head positioning. Reading a small amount of audio data before querying
+sub-channel data ("audio warmup") resolves the issue.
+.IP "\fBLast track failures:\fR"
+Some drives show elevated (~5-10%) failure rates on the last track.
+.IP "\fBIntermittent failures:\fR"
+Any track can occasionally fail to return ISRC data, even in the middle of repeated
+successful reads on the same drive and disc.
+.IP "\fBHallucinated data:\fR"
+Occasionally drives return properly-formatted but incorrect ISRC data. Format
+validation cannot detect these errors.
+.IP "\fBPossible caching:\fR"
+Repeated queries sometimes return what appears to be stale data, which may explain
+why immediate retries sometimes return the same incorrect result.
+.SS Current Approach
+.B mbdiscid
+uses a two-stage probe to quickly detect whether a disc contains ISRCs:
+.PP
+.B 1. Quick probe:
+A fast probe (5-second timeout, single attempt, no audio warmup) on a middle track
+to avoid the problematic track 1.
+.PP
+.B 2. Full probe fallback:
+If the quick probe fails, a full probe (30-second timeout, 3 attempts, with audio
+warmup) on the last track. Track 1 is avoided as fallback since it has the highest
+failure rate.
+.PP
+.B 3. Early exit:
+If both probes fail, the disc likely has no ISRCs and
+.B mbdiscid
+returns without further attempts.
+.PP
+For discs with 3 or fewer tracks, there are limited options: 2-3 track discs probe
+track 2; single-track discs must use track 1.
+.PP
+Once ISRC presence is confirmed, all tracks are read using full mode (with audio
+warmup and retries) to maximize reliability.
+.PP
+This approach reduces detection time for discs without ISRCs from 30-60 seconds to
+approximately 5-15 seconds (depending on whether the fallback probe is needed),
+while maintaining reliable detection for discs that do have ISRCs.
+.SS Approaches Not Yet Implemented
+.IP \(bu 2
+Multiple sub-channel reads per track to detect inconsistent or hallucinated data
+.IP \(bu 2
+Probing two non-edge tracks before falling back to an edge track
 .SH SEE ALSO
 .BR cd-discid (1),
 .BR cdparanoia (1)
@@ -193,8 +272,10 @@ sudo. Use raw device paths (e.g., /dev/rdisk16) instead.
 MusicBrainz: https://musicbrainz.org/
 .br
 libdiscid: https://musicbrainz.org/doc/libdiscid
+.br
+AccurateRip: https://www.accuraterip.com/
 .SH AUTHOR
-Written by [Your Name].
+Written by Ian McNish.
 .SH COPYRIGHT
 Copyright \(co 2025 Ian McNish.
 License: MIT
