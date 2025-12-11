@@ -117,10 +117,22 @@ char *calc_accuraterip_id(const toc_t *toc)
 /*
  * Calculate MusicBrainz disc ID using libdiscid
  *
- * MusicBrainz disc IDs are calculated from AUDIO TRACKS ONLY:
- * - For Enhanced CDs: exclude data track at end, use audio session leadout
- * - For Mixed Mode: exclude data track at start, use first audio track number
- * - For standard Audio CDs: include all tracks
+ * Per MusicBrainz documentation (https://musicbrainz.org/doc/Disc_ID_Calculation):
+ *
+ * Mixed Mode CDs (data track FIRST at position 1):
+ *   - Include ALL tracks including the data track
+ *   - Use disc leadout
+ *   - Example: Sarah McLachlan "The Freedom Sessions" - tracks 1-9 where track 1 is data
+ *
+ * Enhanced CDs / CD-Extra (data track LAST / trailing):
+ *   - Exclude trailing data track(s)
+ *   - Use audio session leadout (data_track_offset - 11400, or session 1 leadout)
+ *   - Per libdiscid API: "For discs with additional data tracks, the trailing
+ *     data tracks should be ignored"
+ *
+ * Standard Audio CDs:
+ *   - Include all tracks
+ *   - Use disc leadout
  */
 char *calc_musicbrainz_id(const toc_t *toc)
 {
@@ -128,36 +140,49 @@ char *calc_musicbrainz_id(const toc_t *toc)
     if (!disc)
         return NULL;
 
-    /* Build offsets array for libdiscid - AUDIO TRACKS ONLY */
-    /* libdiscid wants: offsets[0] = leadout (frames), offsets[1..n] = track offsets */
+    /* Build offsets array for libdiscid
+     * libdiscid wants: offsets[0] = leadout, offsets[track_num] = track offset */
     int offsets[MAX_TRACKS + 1];
+    memset(offsets, 0, sizeof(offsets));
 
-    /* Determine first and last audio track numbers */
+    int first_track = toc->first_track;
+    int last_track = toc->last_track;
+    int32_t leadout;
+
+    /* Determine disc type and adjust accordingly */
     int first_audio = toc_get_first_audio_track(toc);
     int last_audio = toc_get_last_audio_track(toc);
 
-    if (first_audio == 0 || last_audio == 0) {
-        /* No audio tracks */
+    if (first_audio == 0) {
+        /* No audio tracks - can't calculate MusicBrainz ID */
         discid_free(disc);
         return NULL;
     }
 
-    /* Use audio_leadout for Enhanced CDs, regular leadout otherwise */
-    int32_t leadout = toc->audio_leadout;
+    /* Check if this is an Enhanced CD (trailing data track) */
+    bool is_enhanced_cd = (last_audio < toc->last_track);
+
+    if (is_enhanced_cd) {
+        /* Enhanced CD: exclude trailing data track(s), use audio_leadout */
+        last_track = last_audio;
+        leadout = toc->audio_leadout;
+    } else {
+        /* Mixed Mode or standard: include all tracks, use disc leadout */
+        leadout = toc->leadout;
+    }
 
     /* Leadout in frames (with pregap) */
     offsets[0] = leadout + PREGAP_FRAMES;
 
-    /* Collect audio track offsets (with pregap) */
-    int audio_idx = 0;
+    /* Collect track offsets for tracks in range */
     for (int i = 0; i < toc->track_count; i++) {
-        if (toc->tracks[i].type == TRACK_TYPE_AUDIO) {
-            offsets[audio_idx + 1] = toc->tracks[i].offset + PREGAP_FRAMES;
-            audio_idx++;
+        int track_num = toc->tracks[i].number;
+        if (track_num >= first_track && track_num <= last_track) {
+            offsets[track_num] = toc->tracks[i].offset + PREGAP_FRAMES;
         }
     }
 
-    int result = discid_put(disc, first_audio, last_audio, offsets);
+    int result = discid_put(disc, first_track, last_track, offsets);
 
     if (!result) {
         discid_free(disc);

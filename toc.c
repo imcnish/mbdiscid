@@ -422,30 +422,35 @@ char *toc_format_musicbrainz(const toc_t *toc)
     int remaining = (int)bufsize;
     int written;
 
-    /* Get first and last audio track numbers */
-    int first_audio = toc_get_first_audio_track(toc);
+    int first_track = toc->first_track;
+    int last_track = toc->last_track;
+    int32_t leadout;
+
+    /* Determine disc type - same logic as calc_musicbrainz_id() */
     int last_audio = toc_get_last_audio_track(toc);
 
-    /* Handle no audio tracks case */
-    if (first_audio == 0 || last_audio == 0) {
-        snprintf(buf, bufsize, "1 1 %d %d",
-                 toc->leadout + PREGAP_FRAMES,
-                 PREGAP_FRAMES);
-        return buf;
-    }
+    /* Check if this is an Enhanced CD (trailing data track) */
+    bool is_enhanced_cd = (last_audio > 0 && last_audio < toc->last_track);
 
-    /* Use audio_leadout for Enhanced CDs */
-    int32_t leadout = toc->audio_leadout + PREGAP_FRAMES;
+    if (is_enhanced_cd) {
+        /* Enhanced CD: exclude trailing data track(s), use audio_leadout */
+        last_track = last_audio;
+        leadout = toc->audio_leadout;
+    } else {
+        /* Mixed Mode or standard: include all tracks, use disc leadout */
+        leadout = toc->leadout;
+    }
 
     /* MusicBrainz format includes +150 pregap in all values */
     written = snprintf(p, remaining, "%d %d %d",
-                       first_audio, last_audio, leadout);
+                       first_track, last_track, leadout + PREGAP_FRAMES);
     p += written;
     remaining -= written;
 
-    /* Output only audio track offsets */
+    /* Output track offsets for tracks in range */
     for (int i = 0; i < toc->track_count; i++) {
-        if (toc->tracks[i].type == TRACK_TYPE_AUDIO) {
+        if (toc->tracks[i].number >= first_track &&
+            toc->tracks[i].number <= last_track) {
             written = snprintf(p, remaining, " %d", toc->tracks[i].offset + PREGAP_FRAMES);
             p += written;
             remaining -= written;

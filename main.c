@@ -42,10 +42,14 @@ static char *read_stdin_toc(void)
 
 /*
  * Calculate and store disc IDs
+ * Returns 0 on success, error code if a required ID fails to calculate
  */
-static void calculate_ids(disc_info_t *disc)
+static int calculate_ids(disc_info_t *disc, int mode, bool quiet)
 {
     char *id;
+    bool need_mb = (mode == MODE_MUSICBRAINZ || mode == MODE_ALL);
+    bool need_freedb = (mode == MODE_FREEDB || mode == MODE_ALL || mode == MODE_ACCURATERIP);
+    bool need_ar = (mode == MODE_ACCURATERIP || mode == MODE_ALL);
 
     /* MusicBrainz ID */
     id = calc_musicbrainz_id(&disc->toc);
@@ -53,6 +57,9 @@ static void calculate_ids(disc_info_t *disc)
         strncpy(disc->ids.musicbrainz, id, MB_ID_LENGTH);
         disc->ids.musicbrainz[MB_ID_LENGTH] = '\0';
         free(id);
+    } else if (need_mb) {
+        error_quiet(quiet, "failed to calculate MusicBrainz disc ID");
+        return EX_SOFTWARE;
     }
 
     /* FreeDB ID */
@@ -61,6 +68,9 @@ static void calculate_ids(disc_info_t *disc)
         strncpy(disc->ids.freedb, id, FREEDB_ID_LENGTH);
         disc->ids.freedb[FREEDB_ID_LENGTH] = '\0';
         free(id);
+    } else if (need_freedb) {
+        error_quiet(quiet, "failed to calculate FreeDB disc ID");
+        return EX_SOFTWARE;
     }
 
     /* AccurateRip ID */
@@ -69,7 +79,12 @@ static void calculate_ids(disc_info_t *disc)
         strncpy(disc->ids.accuraterip, id, AR_ID_LENGTH);
         disc->ids.accuraterip[AR_ID_LENGTH] = '\0';
         free(id);
+    } else if (need_ar) {
+        error_quiet(quiet, "failed to calculate AccurateRip disc ID");
+        return EX_SOFTWARE;
     }
+
+    return 0;
 }
 
 int main(int argc, char **argv)
@@ -135,7 +150,10 @@ int main(int argc, char **argv)
         }
 
         disc.type = toc_get_disc_type(&disc.toc);
-        calculate_ids(&disc);
+        ret = calculate_ids(&disc, opts.mode, opts.quiet);
+        if (ret != 0) {
+            return ret;
+        }
     } else {
         /* Read from device */
         const char *device = opts.device;
@@ -157,7 +175,11 @@ int main(int argc, char **argv)
             return ret;
         }
 
-        calculate_ids(&disc);
+        ret = calculate_ids(&disc, opts.mode, opts.quiet);
+        if (ret != 0) {
+            cdtext_free(&disc.cdtext);
+            return ret;
+        }
     }
 
     /* Generate output based on mode */
