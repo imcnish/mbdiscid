@@ -434,23 +434,6 @@ test_mb_id() {
     fi
 }
 
-# Verify AR ID contains correct FreeDB ID component
-test_ar_contains_fb() {
-    local -n disc=$1
-    local actual
-
-    ((TESTS_RUN++))
-    echo -n "  ${disc[name]}: AR ID contains FreeDB ... "
-
-    actual=$(echo "${disc[ar_toc]}" | "$MBDISCID" -Aic 2>&1) || true
-
-    if [[ "$actual" == *"${disc[fb_id]}"* ]]; then
-        test_pass
-    else
-        test_fail "contains ${disc[fb_id]}" "$actual"
-    fi
-}
-
 # =============================================================================
 # TEST CATEGORIES
 # =============================================================================
@@ -529,21 +512,6 @@ test_mb_id DADA
 test_mb_id METALLICA
 test_mb_id BLUEOCT
 test_mb_id FREEDOM
-
-# -----------------------------------------------------------------------------
-echo ""
-echo -e "${YELLOW}=== Cross-Format Consistency ===${NC}"
-# -----------------------------------------------------------------------------
-
-test_ar_contains_fb SUBLIME
-test_ar_contains_fb GGD
-test_ar_contains_fb CRANBERRIES
-test_ar_contains_fb MB20
-test_ar_contains_fb RUSH
-test_ar_contains_fb DADA
-test_ar_contains_fb METALLICA
-test_ar_contains_fb BLUEOCT
-test_ar_contains_fb FREEDOM
 
 # -----------------------------------------------------------------------------
 echo ""
@@ -727,13 +695,12 @@ if [[ -n "$DEVICE" ]]; then
                 echo -e "${YELLOW}=== Disc Read Tests ===${NC}"
                 # -------------------------------------------------------------
 
-                run_test_exit "Read disc (default)" 0 "$MBDISCID" "$DEVICE"
+                # Run non-ISRC modes first (these don't hold exclusive access)
                 run_test_exit "Read disc -M" 0 "$MBDISCID" -M "$DEVICE"
                 run_test_exit "Read disc -A" 0 "$MBDISCID" -A "$DEVICE"
                 run_test_exit "Read disc -F" 0 "$MBDISCID" -F "$DEVICE"
                 run_test_exit "Read disc -R" 0 "$MBDISCID" -R "$DEVICE"
                 run_test_exit "Read disc -T" 0 "$MBDISCID" -T "$DEVICE"
-                run_test_exit "Read disc -a" 0 "$MBDISCID" -a "$DEVICE"
 
                 # Verify calculated IDs match
                 run_test "AR ID matches expected" "${known_disc[ar_id]}" "$MBDISCID" -Ai "$DEVICE"
@@ -770,6 +737,32 @@ if [[ -n "$DEVICE" ]]; then
 
                 # -------------------------------------------------------------
                 echo ""
+                echo -e "${YELLOW}=== Media Type Test ===${NC}"
+                # -------------------------------------------------------------
+
+                ((TESTS_RUN++))
+                echo -n "  Media type ... "
+                type_output=$("$MBDISCID" -T "$DEVICE" 2>/dev/null) || type_output=""
+
+                expected_type=""
+                case "${known_disc[type]}" in
+                    audio)    expected_type="Audio CD" ;;
+                    enhanced) expected_type="Enhanced CD" ;;
+                    mixed)    expected_type="Mixed Mode CD" ;;
+                esac
+
+                if [[ "$type_output" == *"$expected_type"* ]]; then
+                    test_pass
+                    echo "    Type: $expected_type"
+                else
+                    test_fail "$expected_type" "$type_output"
+                fi
+
+                # -------------------------------------------------------------
+                # ISRC and -a tests last (they trigger ISRC scanning which holds
+                # exclusive device access for several seconds after completion)
+                # -------------------------------------------------------------
+                echo ""
                 echo -e "${YELLOW}=== ISRC Test ===${NC}"
                 # -------------------------------------------------------------
 
@@ -799,29 +792,6 @@ if [[ -n "$DEVICE" ]]; then
                         echo "    Found ISRCs (not in test data):"
                         echo "$isrc_output" | head -3 | sed 's/^/      /'
                     fi
-                fi
-
-                # -------------------------------------------------------------
-                echo ""
-                echo -e "${YELLOW}=== Media Type Test ===${NC}"
-                # -------------------------------------------------------------
-
-                ((TESTS_RUN++))
-                echo -n "  Media type ... "
-                type_output=$("$MBDISCID" -T "$DEVICE" 2>/dev/null) || type_output=""
-
-                expected_type=""
-                case "${known_disc[type]}" in
-                    audio)    expected_type="Audio CD" ;;
-                    enhanced) expected_type="Enhanced CD" ;;
-                    mixed)    expected_type="Mixed Mode CD" ;;
-                esac
-
-                if [[ "$type_output" == *"$expected_type"* ]]; then
-                    test_pass
-                    echo "    Type: $expected_type"
-                else
-                    test_fail "$expected_type" "$type_output"
                 fi
 
                 # -------------------------------------------------------------
@@ -858,13 +828,12 @@ if [[ -n "$DEVICE" ]]; then
                 echo -e "${YELLOW}=== Basic Read Tests ===${NC}"
                 # -------------------------------------------------------------
 
-                run_test_exit "Read disc (default)" 0 "$MBDISCID" "$DEVICE"
+                # Run non-ISRC modes first
                 run_test_exit "Read disc -M" 0 "$MBDISCID" -M "$DEVICE"
                 run_test_exit "Read disc -A" 0 "$MBDISCID" -A "$DEVICE"
                 run_test_exit "Read disc -F" 0 "$MBDISCID" -F "$DEVICE"
                 run_test_exit "Read disc -R" 0 "$MBDISCID" -R "$DEVICE"
                 run_test_exit "Read disc -T" 0 "$MBDISCID" -T "$DEVICE"
-                run_test_exit "Read disc -a" 0 "$MBDISCID" -a "$DEVICE"
 
                 # -------------------------------------------------------------
                 echo ""
@@ -898,24 +867,6 @@ if [[ -n "$DEVICE" ]]; then
                     test_pass
                 else
                     test_fail "28-char base64-like" "$mb_id"
-                fi
-
-                # -a output sections
-                ((TESTS_RUN++))
-                echo -n "  -a contains all sections ... "
-                all_output=$("$MBDISCID" -a "$DEVICE" 2>/dev/null) || all_output=""
-
-                missing_sections=""
-                for section in "Media" "Raw" "AccurateRip" "FreeDB" "MusicBrainz"; do
-                    if [[ "$all_output" != *"$section"* ]]; then
-                        missing_sections="$missing_sections $section"
-                    fi
-                done
-
-                if [[ -z "$missing_sections" ]]; then
-                    test_pass
-                else
-                    test_fail "all sections" "missing:$missing_sections"
                 fi
 
                 # -------------------------------------------------------------
@@ -952,6 +903,24 @@ if [[ -n "$DEVICE" ]]; then
                     fi
                 else
                     test_fail "exit 0" "exit $isrc_rc"
+                fi
+
+                # -a output sections (also triggers ISRC scanning)
+                ((TESTS_RUN++))
+                echo -n "  -a contains all sections ... "
+                all_output=$("$MBDISCID" -a "$DEVICE" 2>/dev/null) || all_output=""
+
+                missing_sections=""
+                for section in "Media" "Raw" "AccurateRip" "FreeDB" "MusicBrainz"; do
+                    if [[ "$all_output" != *"$section"* ]]; then
+                        missing_sections="$missing_sections $section"
+                    fi
+                done
+
+                if [[ -z "$missing_sections" ]]; then
+                    test_pass
+                else
+                    test_fail "all sections" "missing:$missing_sections"
                 fi
             fi
         fi

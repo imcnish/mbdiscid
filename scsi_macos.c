@@ -53,6 +53,7 @@ struct scsi_device {
 
     /* BSD device for fallback ioctls */
     int fd;
+    char bsd_name[64];  /* For polling on close */
 
     char error[256];
 };
@@ -133,6 +134,7 @@ scsi_device_t *scsi_open(const char *device)
     dev->fd = -1;
 
     const char *bsd_name = get_bsd_name(device);
+    snprintf(dev->bsd_name, sizeof(dev->bsd_name), "/dev/%s", bsd_name);
 
     /* Find IOKit media service - may need retry after DA release */
     int retries = 20;
@@ -417,6 +419,22 @@ void scsi_close(scsi_device_t *dev)
 
     if (dev->media_service != IO_OBJECT_NULL) {
         IOObjectRelease(dev->media_service);
+    }
+
+    /*
+     * After releasing DA claim, macOS remounts the disc which can trigger
+     * Spotlight indexing, AV scanners, etc. Poll until the device is
+     * accessible again before returning, so the next scsi_open() can succeed.
+     */
+    if (dev->da_claimed && dev->bsd_name[0]) {
+        for (int i = 0; i < 100; i++) {  /* Up to 10 seconds */
+            int test_fd = open(dev->bsd_name, O_RDONLY | O_NONBLOCK);
+            if (test_fd >= 0) {
+                close(test_fd);
+                break;
+            }
+            usleep(100000);  /* 100ms */
+        }
     }
 
     free(dev);
