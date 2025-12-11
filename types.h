@@ -8,19 +8,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-
-/* Version */
-#ifndef VERSION
-#define VERSION "1.1.0"
-#endif
-
-/* Exit codes from sysexits.h */
-#define EX_OK           0   /* Successful termination */
-#define EX_USAGE        64  /* Command line usage error */
-#define EX_DATAERR      65  /* Data format error */
-#define EX_UNAVAILABLE  69  /* Service unavailable */
-#define EX_SOFTWARE     70  /* Internal software error */
-#define EX_IOERR        74  /* Input/output error */
+#include <sysexits.h>
 
 /* Limits */
 #define MAX_TRACKS      99
@@ -75,9 +63,12 @@ typedef enum {
 /* Track information */
 typedef struct {
     int number;             /* Track number (1-99) */
+    int session;            /* Session number (1-99) */
     track_type_t type;      /* Audio or data */
     int32_t offset;         /* Start LBA (0-based) */
     int32_t length;         /* Length in frames */
+    uint8_t control;        /* Control nibble from TOC */
+    uint8_t adr;            /* ADR nibble from TOC */
     char isrc[ISRC_LENGTH + 1];
 } track_t;
 
@@ -85,11 +76,12 @@ typedef struct {
 typedef struct {
     int first_track;        /* First track number */
     int last_track;         /* Last track number */
-    int track_count;        /* Total tracks */
+    int track_count;        /* Total tracks (audio + data) */
     int audio_count;        /* Audio track count */
     int data_count;         /* Data track count */
     int32_t leadout;        /* Leadout LBA */
     int32_t audio_leadout;  /* Audio session leadout (for Enhanced CDs) */
+    int last_session;       /* Last session number */
     track_t tracks[MAX_TRACKS];
 } toc_t;
 

@@ -24,25 +24,25 @@ static struct option long_opts[] = {
     {"freedb",      no_argument, NULL, 'F'},
     {"musicbrainz", no_argument, NULL, 'M'},
     {"all",         no_argument, NULL, 'a'},
-    
+
     /* Actions */
     {"toc",         no_argument, NULL, 't'},
     {"id",          no_argument, NULL, 'i'},
     {"url",         no_argument, NULL, 'u'},
     {"open",        no_argument, NULL, 'o'},
-    
+
     /* Modifiers */
     {"calculate",   no_argument, NULL, 'c'},
     {"quiet",       no_argument, NULL, 'q'},
-    
+
     /* Standalone */
     {"list-drives", no_argument, NULL, 'L'},
     {"help",        no_argument, NULL, 'h'},
     {"version",     no_argument, NULL, 'V'},
-    
+
     /* Verbose */
     {"verbose",     no_argument, NULL, 'v'},
-    
+
     {NULL, 0, NULL, 0}
 };
 
@@ -71,13 +71,13 @@ static cli_mode_t char_to_mode(int c)
 int cli_parse(int argc, char **argv, options_t *opts)
 {
     memset(opts, 0, sizeof(*opts));
-    
+
     int c;
     int mode_count = 0;
-    
+
     /* Reset getopt */
     optind = 1;
-    
+
     while ((c = getopt_long(argc, argv, short_opts, long_opts, NULL)) != -1) {
         switch (c) {
         /* Modes */
@@ -96,7 +96,7 @@ int cli_parse(int argc, char **argv, options_t *opts)
             opts->mode = char_to_mode(c);
             mode_count++;
             break;
-        
+
         /* Actions */
         case 't':
             opts->actions |= ACTION_TOC;
@@ -110,7 +110,7 @@ int cli_parse(int argc, char **argv, options_t *opts)
         case 'o':
             opts->actions |= ACTION_OPEN;
             break;
-        
+
         /* Modifiers */
         case 'c':
             opts->calculate = true;
@@ -118,7 +118,7 @@ int cli_parse(int argc, char **argv, options_t *opts)
         case 'q':
             opts->quiet = true;
             break;
-        
+
         /* Standalone */
         case 'L':
             opts->list_drives = true;
@@ -129,24 +129,24 @@ int cli_parse(int argc, char **argv, options_t *opts)
         case 'V':
             opts->version = true;
             break;
-        
+
         /* Verbose */
         case 'v':
             opts->verbosity++;
             break;
-        
+
         case '?':
         default:
             return EX_USAGE;
         }
     }
-    
+
     /* Check for multiple modes */
     if (mode_count > 1) {
         error_quiet(opts->quiet, "modes are mutually exclusive");
         return EX_USAGE;
     }
-    
+
     /* Handle remaining arguments */
     if (optind < argc) {
         if (opts->calculate) {
@@ -155,23 +155,23 @@ int cli_parse(int argc, char **argv, options_t *opts)
             for (int i = optind; i < argc; i++) {
                 total_len += strlen(argv[i]) + 1;
             }
-            
+
             char *cdtoc = xmalloc(total_len + 1);
             cdtoc[0] = '\0';
-            
+
             for (int i = optind; i < argc; i++) {
                 if (i > optind)
                     strcat(cdtoc, " ");
                 strcat(cdtoc, argv[i]);
             }
-            
+
             /* Check if it looks like a device path */
             if (cdtoc[0] == '/') {
                 error_quiet(opts->quiet, "-c expects TOC data, not a device path");
                 free(cdtoc);
                 return EX_USAGE;
             }
-            
+
             opts->cdtoc = cdtoc;
         } else {
             /* Single device argument */
@@ -182,7 +182,7 @@ int cli_parse(int argc, char **argv, options_t *opts)
             opts->device = argv[optind];
         }
     }
-    
+
     return 0;
 }
 
@@ -194,13 +194,13 @@ int cli_validate(const options_t *opts)
     /* Standalone options skip other validation */
     if (opts->help || opts->version || opts->list_drives)
         return 0;
-    
+
     /* -c with disc-required modes */
     if (opts->calculate) {
         if (opts->mode == MODE_TYPE || opts->mode == MODE_TEXT ||
             opts->mode == MODE_MCN || opts->mode == MODE_ISRC ||
             opts->mode == MODE_RAW || opts->mode == MODE_ALL) {
-            
+
             if (opts->mode == MODE_RAW || opts->mode == MODE_ALL) {
                 error_quiet(opts->quiet, "-c is mutually exclusive with -%c",
                            opts->mode == MODE_RAW ? 'R' : 'a');
@@ -213,24 +213,24 @@ int cli_validate(const options_t *opts)
             return EX_USAGE;
         }
     }
-    
+
     /* -u and -o only valid for MusicBrainz or All mode */
     if ((opts->actions & ACTION_URL) || (opts->actions & ACTION_OPEN)) {
         cli_mode_t effective_mode = opts->mode;
         if (effective_mode == MODE_NONE)
             effective_mode = MODE_MUSICBRAINZ;  /* Default */
-        
+
         if (effective_mode != MODE_MUSICBRAINZ && effective_mode != MODE_ALL) {
             error_quiet(opts->quiet, "-u/-o not supported for this mode");
             return EX_USAGE;
         }
     }
-    
+
     /* Need either device or -c (or stdin for -c) */
     if (!opts->calculate && !opts->device) {
         /* Will read from device - but we'll check this later when we know the mode */
     }
-    
+
     return 0;
 }
 
@@ -242,7 +242,7 @@ void cli_apply_defaults(options_t *opts)
     /* Standalone options - no defaults needed */
     if (opts->help || opts->version || opts->list_drives)
         return;
-    
+
     /* Default mode resolution */
     if (opts->mode == MODE_NONE) {
         if (opts->calculate) {
@@ -256,7 +256,7 @@ void cli_apply_defaults(options_t *opts)
             opts->mode = MODE_ALL;
         }
     }
-    
+
     /* Default action resolution */
     if (opts->actions == ACTION_NONE) {
         switch (opts->mode) {
@@ -274,7 +274,7 @@ void cli_apply_defaults(options_t *opts)
             break;
         }
     }
-    
+
     /* Special handling for Raw mode with -i */
     if (opts->mode == MODE_RAW && (opts->actions & ACTION_ID)) {
         /* Raw mode has no ID, convert -i to -t */
@@ -332,8 +332,8 @@ void cli_print_help(void)
  */
 void cli_print_version(void)
 {
-    printf("mbdiscid %s\n", VERSION);
-    printf("libdiscid %s\n", get_libdiscid_version());
+    printf("mbdiscid %s\n", MBDISCID_VERSION);
+    printf("%s\n", get_libdiscid_version());
 }
 
 /*
@@ -363,24 +363,24 @@ bool cli_action_valid_for_mode(action_t action, cli_mode_t mode)
     case MODE_RAW:
         /* Raw only supports TOC */
         return action == ACTION_TOC;
-    
+
     case MODE_TYPE:
     case MODE_TEXT:
     case MODE_MCN:
     case MODE_ISRC:
         /* These only support ID (value) */
         return action == ACTION_ID;
-    
+
     case MODE_ACCURATERIP:
     case MODE_FREEDB:
         /* Support TOC and ID */
         return action == ACTION_TOC || action == ACTION_ID;
-    
+
     case MODE_MUSICBRAINZ:
     case MODE_ALL:
         /* Support all actions */
         return true;
-    
+
     default:
         return false;
     }

@@ -1,329 +1,238 @@
 /*
  * mbdiscid - Disc ID calculator
- * main.c - Main entry point
+ * main.c - Entry point
  */
 
 #include "types.h"
 #include "cli.h"
+#include "device.h"
 #include "toc.h"
 #include "discid.h"
-#include "device.h"
 #include "output.h"
 #include "util.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 /*
- * Read CDTOC from stdin
+ * Read TOC from stdin (for -c without arguments)
  */
-static char *read_stdin(void)
+static char *read_stdin_toc(void)
 {
-    size_t bufsize = 4096;
-    size_t len = 0;
-    char *buf = xmalloc(bufsize);
-    
-    int c;
-    while ((c = getchar()) != EOF) {
-        if (len + 1 >= bufsize) {
-            bufsize *= 2;
-            buf = xrealloc(buf, bufsize);
-        }
-        buf[len++] = (char)c;
+    char buf[4096];
+    size_t total = 0;
+    char *result = NULL;
+
+    while (fgets(buf, sizeof(buf), stdin)) {
+        size_t len = strlen(buf);
+        result = xrealloc(result, total + len + 1);
+        memcpy(result + total, buf, len + 1);
+        total += len;
     }
-    buf[len] = '\0';
-    
-    return buf;
+
+    if (result) {
+        /* Trim trailing newlines */
+        while (total > 0 && (result[total-1] == '\n' || result[total-1] == '\r')) {
+            result[--total] = '\0';
+        }
+    }
+
+    return result;
 }
 
 /*
- * Calculate disc IDs from TOC
+ * Calculate and store disc IDs
  */
-static int calculate_ids(disc_info_t *disc)
+static void calculate_ids(disc_info_t *disc)
 {
-    /* AccurateRip ID */
-    char *ar_id = calc_accuraterip_id(&disc->toc);
-    if (ar_id) {
-        strncpy(disc->ids.accuraterip, ar_id, AR_ID_LENGTH);
-        disc->ids.accuraterip[AR_ID_LENGTH] = '\0';
-        free(ar_id);
-    }
-    
-    /* FreeDB ID */
-    char *fb_id = calc_freedb_id(&disc->toc);
-    if (fb_id) {
-        strncpy(disc->ids.freedb, fb_id, FREEDB_ID_LENGTH);
-        disc->ids.freedb[FREEDB_ID_LENGTH] = '\0';
-        free(fb_id);
-    }
-    
+    char *id;
+
     /* MusicBrainz ID */
-    char *mb_id = calc_musicbrainz_id(&disc->toc);
-    if (mb_id) {
-        strncpy(disc->ids.musicbrainz, mb_id, MB_ID_LENGTH);
+    id = calc_musicbrainz_id(&disc->toc);
+    if (id) {
+        strncpy(disc->ids.musicbrainz, id, MB_ID_LENGTH);
         disc->ids.musicbrainz[MB_ID_LENGTH] = '\0';
-        free(mb_id);
+        free(id);
     }
-    
-    return 0;
-}
 
-/*
- * Process CDTOC input mode
- */
-static int process_cdtoc(const options_t *opts)
-{
-    const char *input = opts->cdtoc;
-    char *stdin_buf = NULL;
-    
-    /* Read from stdin if no CDTOC provided */
-    if (!input) {
-        stdin_buf = read_stdin();
-        input = stdin_buf;
+    /* FreeDB ID */
+    id = calc_freedb_id(&disc->toc);
+    if (id) {
+        strncpy(disc->ids.freedb, id, FREEDB_ID_LENGTH);
+        disc->ids.freedb[FREEDB_ID_LENGTH] = '\0';
+        free(id);
     }
-    
-    /* Duplicate and trim whitespace */
-    char *buf = xstrdup(input);
-    char *trimmed = trim(buf);  /* trim returns pointer into buf */
-    
-    if (strlen(trimmed) == 0) {
-        error_quiet(opts->quiet, "empty TOC input");
-        free(buf);       /* free the original allocation */
-        free(stdin_buf);
-        return EX_DATAERR;
-    }
-    
-    /* Parse TOC according to mode's format */
-    toc_format_t format = cli_get_toc_format(opts->mode);
-    
-    disc_info_t disc;
-    memset(&disc, 0, sizeof(disc));
-    
-    int ret = toc_parse(&disc.toc, trimmed, format);
-    free(buf);           /* free the original allocation */
-    free(stdin_buf);
-    
-    if (ret != 0) {
-        error_quiet(opts->quiet, "invalid TOC format");
-        return ret;
-    }
-    
-    /* Determine disc type */
-    disc.type = toc_get_disc_type(&disc.toc);
-    
-    /* Calculate IDs */
-    calculate_ids(&disc);
-    
-    /* Output based on mode and actions */
-    switch (opts->mode) {
-    case MODE_ACCURATERIP:
-        if (opts->actions & ACTION_TOC)
-            output_accuraterip_toc(&disc.toc);
-        if (opts->actions & ACTION_ID)
-            output_accuraterip_id(disc.ids.accuraterip);
-        break;
-    
-    case MODE_FREEDB:
-        if (opts->actions & ACTION_TOC)
-            output_freedb_toc(&disc.toc);
-        if (opts->actions & ACTION_ID)
-            output_freedb_id(disc.ids.freedb);
-        break;
-    
-    case MODE_MUSICBRAINZ:
-        if (opts->actions & ACTION_TOC)
-            output_musicbrainz_toc(&disc.toc);
-        if (opts->actions & ACTION_ID)
-            output_musicbrainz_id(disc.ids.musicbrainz);
-        if (opts->actions & ACTION_URL) {
-            char *url = get_musicbrainz_url(disc.ids.musicbrainz);
-            output_musicbrainz_url(url);
-            if (opts->actions & ACTION_OPEN) {
-                output_open_url(url);
-            }
-            free(url);
-        } else if (opts->actions & ACTION_OPEN) {
-            char *url = get_musicbrainz_url(disc.ids.musicbrainz);
-            output_open_url(url);
-            free(url);
-        }
-        break;
-    
-    default:
-        /* Should not happen - validation should catch this */
-        return EX_SOFTWARE;
-    }
-    
-    return EX_OK;
-}
 
-/*
- * Process disc reading mode
- */
-static int process_disc(const options_t *opts)
-{
-    const char *device = opts->device;
-    if (!device) {
-        device = device_get_default();
+    /* AccurateRip ID */
+    id = calc_accuraterip_id(&disc->toc);
+    if (id) {
+        strncpy(disc->ids.accuraterip, id, AR_ID_LENGTH);
+        disc->ids.accuraterip[AR_ID_LENGTH] = '\0';
+        free(id);
     }
-    
-    if (!device) {
-        error_quiet(opts->quiet, "no device specified and no default available");
-        return EX_USAGE;
-    }
-    
-    verbose(1, opts->verbosity, "Reading disc from %s", device);
-    
-    disc_info_t disc;
-    memset(&disc, 0, sizeof(disc));
-    
-    /* Determine what data to read based on mode */
-    int read_flags = 0;
-    switch (opts->mode) {
-    case MODE_MCN:
-        read_flags = READ_MCN;
-        break;
-    case MODE_ISRC:
-        read_flags = READ_ISRC;
-        break;
-    case MODE_TEXT:
-        read_flags = READ_CDTEXT;
-        break;
-    case MODE_ALL:
-        read_flags = READ_ALL;
-        break;
-    default:
-        /* TOC-only modes: TYPE, RAW, ACCURATERIP, FREEDB, MUSICBRAINZ */
-        read_flags = 0;
-        break;
-    }
-    
-    int ret = device_read_disc(device, &disc, read_flags, opts->verbosity);
-    if (ret != 0) {
-        return ret;
-    }
-    
-    /* Calculate IDs */
-    calculate_ids(&disc);
-    
-    /* Output based on mode */
-    switch (opts->mode) {
-    case MODE_TYPE:
-        output_type(&disc);
-        break;
-    
-    case MODE_TEXT:
-        output_text(&disc);
-        break;
-    
-    case MODE_MCN:
-        output_mcn(&disc);
-        break;
-    
-    case MODE_ISRC:
-        output_isrc(&disc);
-        break;
-    
-    case MODE_RAW:
-        output_raw_toc(&disc.toc);
-        break;
-    
-    case MODE_ACCURATERIP:
-        if (opts->actions & ACTION_TOC)
-            output_accuraterip_toc(&disc.toc);
-        if (opts->actions & ACTION_ID)
-            output_accuraterip_id(disc.ids.accuraterip);
-        break;
-    
-    case MODE_FREEDB:
-        if (opts->actions & ACTION_TOC)
-            output_freedb_toc(&disc.toc);
-        if (opts->actions & ACTION_ID)
-            output_freedb_id(disc.ids.freedb);
-        break;
-    
-    case MODE_MUSICBRAINZ:
-        if (opts->actions & ACTION_TOC)
-            output_musicbrainz_toc(&disc.toc);
-        if (opts->actions & ACTION_ID)
-            output_musicbrainz_id(disc.ids.musicbrainz);
-        if (opts->actions & ACTION_URL) {
-            char *url = get_musicbrainz_url(disc.ids.musicbrainz);
-            output_musicbrainz_url(url);
-            if (opts->actions & ACTION_OPEN) {
-                output_open_url(url);
-            }
-            free(url);
-        } else if (opts->actions & ACTION_OPEN) {
-            char *url = get_musicbrainz_url(disc.ids.musicbrainz);
-            output_open_url(url);
-            free(url);
-        }
-        break;
-    
-    case MODE_ALL:
-        output_all(&disc, opts);
-        if (opts->actions & ACTION_OPEN) {
-            char *url = get_musicbrainz_url(disc.ids.musicbrainz);
-            output_open_url(url);
-            free(url);
-        }
-        break;
-    
-    default:
-        return EX_SOFTWARE;
-    }
-    
-    cdtext_free(&disc.cdtext);
-    return EX_OK;
 }
 
 int main(int argc, char **argv)
 {
     options_t opts;
     int ret;
-    
+
     /* Parse command line */
     ret = cli_parse(argc, argv, &opts);
     if (ret != 0) {
         return ret;
     }
-    
+
     /* Handle standalone options */
     if (opts.help) {
         cli_print_help();
         return EX_OK;
     }
-    
+
     if (opts.version) {
         cli_print_version();
         return EX_OK;
     }
-    
+
     if (opts.list_drives) {
         return device_list_drives();
     }
-    
-    /* Print version banner in verbose mode */
-    if (opts.verbosity > 0) {
-        fprintf(stderr, "mbdiscid %s\n", VERSION);
-        fprintf(stderr, "libdiscid %s\n", get_libdiscid_version());
-    }
-    
-    /* Apply defaults */
-    cli_apply_defaults(&opts);
-    
+
     /* Validate options */
     ret = cli_validate(&opts);
     if (ret != 0) {
         return ret;
     }
-    
-    /* Process based on mode */
+
+    /* Apply defaults */
+    cli_apply_defaults(&opts);
+
+    disc_info_t disc;
+    memset(&disc, 0, sizeof(disc));
+
     if (opts.calculate) {
-        return process_cdtoc(&opts);
+        /* Calculate from TOC string */
+        const char *toc_str = opts.cdtoc;
+        char *stdin_toc = NULL;
+
+        if (!toc_str) {
+            /* Read from stdin */
+            stdin_toc = read_stdin_toc();
+            if (!stdin_toc || !stdin_toc[0]) {
+                error_quiet(opts.quiet, "no TOC data provided");
+                free(stdin_toc);
+                return EX_DATAERR;
+            }
+            toc_str = stdin_toc;
+        }
+
+        toc_format_t format = cli_get_toc_format(opts.mode);
+        ret = toc_parse(&disc.toc, toc_str, format);
+        free(stdin_toc);
+
+        if (ret != 0) {
+            return ret;
+        }
+
+        disc.type = toc_get_disc_type(&disc.toc);
+        calculate_ids(&disc);
     } else {
-        return process_disc(&opts);
+        /* Read from device */
+        const char *device = opts.device;
+        if (!device) {
+            device = device_get_default();
+        }
+
+        if (!device) {
+            error_quiet(opts.quiet, "no device specified and no default device found");
+            return EX_USAGE;
+        }
+
+        /* Determine what to read based on mode */
+        int flags = 0;
+        if (opts.mode == MODE_MCN || opts.mode == MODE_ALL) {
+            flags |= READ_MCN;
+        }
+        if (opts.mode == MODE_ISRC || opts.mode == MODE_ALL) {
+            flags |= READ_ISRC;
+        }
+        if (opts.mode == MODE_TEXT || opts.mode == MODE_ALL) {
+            flags |= READ_CDTEXT;
+        }
+
+        ret = device_read_disc(device, &disc, flags, opts.verbosity);
+        if (ret != 0) {
+            return ret;
+        }
+
+        calculate_ids(&disc);
     }
+
+    /* Generate output based on mode */
+    switch (opts.mode) {
+    case MODE_TYPE:
+        output_type(&disc);
+        break;
+
+    case MODE_TEXT:
+        output_text(&disc);
+        break;
+
+    case MODE_MCN:
+        output_mcn(&disc);
+        break;
+
+    case MODE_ISRC:
+        output_isrc(&disc);
+        break;
+
+    case MODE_RAW:
+        output_raw_toc(&disc.toc);
+        break;
+
+    case MODE_ACCURATERIP:
+        if (opts.actions & ACTION_TOC)
+            output_accuraterip_toc(&disc.toc);
+        if (opts.actions & ACTION_ID)
+            output_accuraterip_id(disc.ids.accuraterip);
+        break;
+
+    case MODE_FREEDB:
+        if (opts.actions & ACTION_TOC)
+            output_freedb_toc(&disc.toc);
+        if (opts.actions & ACTION_ID)
+            output_freedb_id(disc.ids.freedb);
+        break;
+
+    case MODE_MUSICBRAINZ:
+        if (opts.actions & ACTION_TOC)
+            output_musicbrainz_toc(&disc.toc);
+        if (opts.actions & ACTION_ID)
+            output_musicbrainz_id(disc.ids.musicbrainz);
+        if (opts.actions & ACTION_URL) {
+            char *url = get_musicbrainz_url(disc.ids.musicbrainz);
+            output_musicbrainz_url(url);
+            free(url);
+        }
+        if (opts.actions & ACTION_OPEN) {
+            char *url = get_musicbrainz_url(disc.ids.musicbrainz);
+            output_open_url(url);
+            free(url);
+        }
+        break;
+
+    case MODE_ALL:
+        output_all(&disc, &opts);
+        break;
+
+    default:
+        /* Should not reach here after cli_apply_defaults */
+        output_musicbrainz_id(disc.ids.musicbrainz);
+        break;
+    }
+
+    /* Cleanup */
+    cdtext_free(&disc.cdtext);
+
+    return EX_OK;
 }

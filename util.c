@@ -212,3 +212,20 @@ int32_t frames_to_seconds(int32_t frames)
 {
     return frames / FRAMES_PER_SECOND;
 }
+
+/*
+ * Convert LBA to MSF (minutes, seconds, frames)
+ * Input is raw frame count (not adjusted for pregap)
+ */
+void lba_to_msf(int32_t lba, int *m, int *s, int *f)
+{
+    if (lba < 0) {
+        *m = *s = *f = 0;
+        return;
+    }
+    
+    *f = lba % FRAMES_PER_SECOND;
+    int total_seconds = lba / FRAMES_PER_SECOND;
+    *s = total_seconds % 60;
+    *m = total_seconds / 60;
+}

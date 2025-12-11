@@ -32,4 +32,7 @@ bool is_valid_mcn(const char *mcn);
 int32_t lba_to_seconds(int32_t lba);
 int32_t frames_to_seconds(int32_t frames);
 
+/* MSF formatting */
+void lba_to_msf(int32_t lba, int *m, int *s, int *f);
+
 #endif /* MBDISCID_UTIL_H */

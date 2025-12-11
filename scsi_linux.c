@@ -17,11 +17,16 @@
 /* SCSI commands */
 #define READ_SUBCHANNEL 0x42
 #define READ_CD         0xBE
+#define READ_TOC        0x43
 
 /* Subchannel data format codes */
 #define SUB_Q_CHANNEL_DATA  0x00
 #define SUB_Q_MCN           0x02
 #define SUB_Q_ISRC          0x03
+
+/* READ TOC format codes */
+#define TOC_FORMAT_TOC      0x00
+#define TOC_FORMAT_CDTEXT   0x05
 
 /* Timeout in milliseconds */
 #define SCSI_TIMEOUT 30000
@@ -116,25 +121,6 @@ static int scsi_cmd(scsi_device_t *dev,
 
 /*
  * Read raw Q-subchannel data at a specific LBA using READ CD command
- *
- * READ CD (0xBE) CDB format:
- *   Byte 0: 0xBE (opcode)
- *   Byte 1: Expected sector type (bits 2-4): 1 = CD-DA
- *   Bytes 2-5: Starting LBA (big endian)
- *   Bytes 6-8: Transfer length (big endian)
- *   Byte 9: Main channel selection flags
- *   Byte 10: Subchannel selection: 1 = raw (96 bytes), 2 = Q only (16 bytes)
- *   Byte 11: 0
- *
- * With subchannel = 1 (raw 96 bytes deinterleaved):
- *   Bytes 0-11: P subchannel
- *   Bytes 12-23: Q subchannel (what we want)
- *   Bytes 24-95: R-W subchannels
- *
- * Q subchannel format (12 bytes):
- *   Byte 0: Control (4 bits) | ADR (4 bits)
- *   Bytes 1-9: Mode-dependent data
- *   Bytes 10-11: CRC-16 CCITT
  */
 bool scsi_read_q_subchannel(scsi_device_t *dev, int32_t lba, q_subchannel_t *q)
 {
@@ -167,23 +153,6 @@ bool scsi_read_q_subchannel(scsi_device_t *dev, int32_t lba, q_subchannel_t *q)
     if (scsi_cmd(dev, cdb, sizeof(cdb), buf, sizeof(buf), sense, sizeof(sense)) < 0) {
         return false;
     }
-
-    /*
-     * Formatted Q subchannel (16 bytes) from READ CD:
-     * Byte 0: Control (4 bits) | ADR (4 bits)
-     * Byte 1: Track number
-     * Byte 2: Index
-     * Byte 3: Relative minute
-     * Byte 4: Relative second
-     * Byte 5: Relative frame
-     * Byte 6: Zero
-     * Byte 7: Absolute minute
-     * Byte 8: Absolute second
-     * Byte 9: Absolute frame
-     * Bytes 10-15: Zero or ISRC/MCN data depending on ADR
-     *
-     * Note: For ADR=3 (ISRC), the ISRC data replaces position data
-     */
 
     /* Extract control and ADR */
     q->control = (buf[0] >> 4) & 0x0F;
@@ -377,17 +346,6 @@ int scsi_read_q_subchannel_batch(scsi_device_t *dev, int32_t lba, int count, q_s
 
 /*
  * Read ISRC for a specific track using READ SUB-CHANNEL command
- * (High-level interface - kept for compatibility)
- *
- * CDB format for READ SUB-CHANNEL (42h):
- *   Byte 0: 42h (opcode)
- *   Byte 1: reserved
- *   Byte 2: bit 6 = MSF (0=LBA), bit 5 = SubQ (1=return Q subchannel)
- *   Byte 3: Sub-channel data format (03h = ISRC)
- *   Byte 4-5: reserved
- *   Byte 6: Track number
- *   Byte 7-8: Allocation length
- *   Byte 9: Control
  */
 bool scsi_read_isrc(scsi_device_t *dev, int track, char *isrc)
 {
@@ -445,9 +403,6 @@ bool scsi_read_isrc(scsi_device_t *dev, int track, char *isrc)
 
 /*
  * Read MCN using READ SUB-CHANNEL command
- * (High-level interface - kept for compatibility)
- *
- * Same CDB format but with data format 02h for MCN
  */
 bool scsi_read_mcn(scsi_device_t *dev, char *mcn)
 {
@@ -505,14 +460,6 @@ bool scsi_read_mcn(scsi_device_t *dev, char *mcn)
 
 /*
  * Read TOC to get track control bytes
- * Uses READ TOC command (0x43) format 0 (TOC)
- *
- * CDB format:
- *   Byte 0: 0x43 (opcode)
- *   Byte 1: bit 1 = MSF (0=LBA)
- *   Byte 2: Format (0 = TOC)
- *   Byte 6: Track/session number (0 = all)
- *   Byte 7-8: Allocation length
  */
 bool scsi_read_toc_control(scsi_device_t *dev, int *first_track, int *last_track,
                            uint8_t *control)
@@ -526,9 +473,9 @@ bool scsi_read_toc_control(scsi_device_t *dev, int *first_track, int *last_track
     }
 
     memset(cdb, 0, sizeof(cdb));
-    cdb[0] = 0x43;            /* READ TOC */
+    cdb[0] = READ_TOC;
     cdb[1] = 0x00;            /* LBA format */
-    cdb[2] = 0x00;            /* Format 0 = TOC */
+    cdb[2] = TOC_FORMAT_TOC;  /* Format 0 = TOC */
     cdb[6] = 0;               /* Starting track */
     cdb[7] = (sizeof(buf) >> 8) & 0xFF;  /* Allocation length MSB */
     cdb[8] = sizeof(buf) & 0xFF;         /* Allocation length LSB */
@@ -541,9 +488,6 @@ bool scsi_read_toc_control(scsi_device_t *dev, int *first_track, int *last_track
     }
 
     /* Parse TOC header */
-    /* Bytes 0-1: TOC data length (excluding these 2 bytes) */
-    /* Byte 2: First track number */
-    /* Byte 3: Last track number */
     *first_track = buf[2];
     *last_track = buf[3];
 
@@ -551,26 +495,123 @@ bool scsi_read_toc_control(scsi_device_t *dev, int *first_track, int *last_track
     memset(control, 0, 100);
 
     /* Parse track descriptors starting at byte 4 */
-    /* Each descriptor is 8 bytes:
-     *   Byte 0: Reserved
-     *   Byte 1: ADR (upper 4 bits) | Control (lower 4 bits)
-     *   Byte 2: Track number
-     *   Byte 3: Reserved
-     *   Bytes 4-7: Track start address (LBA)
-     */
     int toc_len = ((buf[0] << 8) | buf[1]) + 2;
     int num_descriptors = (toc_len - 4) / 8;
 
     for (int i = 0; i < num_descriptors; i++) {
         int offset = 4 + i * 8;
         int track_num = buf[offset + 2];
-        uint8_t ctrl = buf[offset + 1] & 0x0F;  /* Control is lower 4 bits */
+        uint8_t ctrl = buf[offset + 1] & 0x0F;
 
         if (track_num < 100) {
             control[track_num] = ctrl;
         }
     }
 
+    return true;
+}
+
+/*
+ * Read raw CD-Text data using READ TOC/PMA/ATIP command (format 5)
+ *
+ * READ TOC command (0x43) with format 5 returns CD-Text packs:
+ *   Bytes 0-1: Data length (big-endian, excludes these 2 bytes)
+ *   Bytes 2-3: Reserved
+ *   Bytes 4+:  CD-Text packs (18 bytes each)
+ */
+bool scsi_read_cdtext_raw(scsi_device_t *dev, uint8_t **data, size_t *len)
+{
+    unsigned char cdb[10];
+    unsigned char sense[32];
+
+    *data = NULL;
+    *len = 0;
+
+    if (!dev || dev->fd < 0) {
+        return false;
+    }
+
+    /* First, query with minimal buffer to get actual length */
+    unsigned char header[4];
+    memset(cdb, 0, sizeof(cdb));
+    cdb[0] = READ_TOC;
+    cdb[1] = 0x00;            /* LBA format (not relevant for CD-Text) */
+    cdb[2] = TOC_FORMAT_CDTEXT;  /* Format 5 = CD-Text */
+    cdb[6] = 0;               /* Track/session (0 for CD-Text) */
+    cdb[7] = 0;               /* Allocation length MSB */
+    cdb[8] = 4;               /* Allocation length LSB = header only */
+
+    memset(header, 0, sizeof(header));
+    memset(sense, 0, sizeof(sense));
+
+    if (scsi_cmd(dev, cdb, sizeof(cdb), header, sizeof(header), sense, sizeof(sense)) < 0) {
+        snprintf(dev->error, sizeof(dev->error), "CD-Text query failed");
+        return false;
+    }
+
+    /* Parse data length from header (big-endian) */
+    uint16_t data_len = ((uint16_t)header[0] << 8) | header[1];
+
+    /* data_len excludes the 2-byte length field itself */
+    /* Total response size = data_len + 2 */
+    /* CD-Text packs start at byte 4, so pack data length = data_len - 2 */
+
+    if (data_len < 2) {
+        /* No CD-Text data (just header, no packs) */
+        return false;
+    }
+
+    size_t total_len = data_len + 2;
+    size_t pack_data_len = data_len - 2;
+
+    /* Sanity check: must be multiple of 18-byte packs */
+    if (pack_data_len % 18 != 0) {
+        snprintf(dev->error, sizeof(dev->error),
+                 "CD-Text data length %zu not multiple of 18", pack_data_len);
+        return false;
+    }
+
+    /* Sanity check: reasonable maximum (255 packs = 4590 bytes) */
+    if (total_len > 8192) {
+        snprintf(dev->error, sizeof(dev->error),
+                 "CD-Text data length %zu exceeds maximum", total_len);
+        return false;
+    }
+
+    /* Allocate buffer and read full data */
+    unsigned char *buf = malloc(total_len);
+    if (!buf) {
+        return false;
+    }
+
+    memset(cdb, 0, sizeof(cdb));
+    cdb[0] = READ_TOC;
+    cdb[1] = 0x00;
+    cdb[2] = TOC_FORMAT_CDTEXT;
+    cdb[6] = 0;
+    cdb[7] = (total_len >> 8) & 0xFF;
+    cdb[8] = total_len & 0xFF;
+
+    memset(buf, 0, total_len);
+    memset(sense, 0, sizeof(sense));
+
+    if (scsi_cmd(dev, cdb, sizeof(cdb), buf, total_len, sense, sizeof(sense)) < 0) {
+        free(buf);
+        snprintf(dev->error, sizeof(dev->error), "CD-Text read failed");
+        return false;
+    }
+
+    /* Return pack data (skip 4-byte header) */
+    *data = malloc(pack_data_len);
+    if (!*data) {
+        free(buf);
+        return false;
+    }
+
+    memcpy(*data, buf + 4, pack_data_len);
+    *len = pack_data_len;
+
+    free(buf);
     return true;
 }
 

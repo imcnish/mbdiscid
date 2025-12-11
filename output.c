@@ -54,13 +54,87 @@ static const char *disc_type_tech_name(disc_type_t type)
 }
 
 /*
+ * Format disc size in human-readable form
+ */
+static void format_disc_size(int32_t leadout, char *buf, size_t bufsize)
+{
+    /* Calculate size in MB (2048 bytes per sector for data, but we show raw capacity) */
+    /* Raw capacity: leadout frames * 2352 bytes per frame */
+    double raw_mb = ((double)leadout * 2352.0) / (1024.0 * 1024.0);
+    
+    if (raw_mb >= 1024.0) {
+        snprintf(buf, bufsize, "%.1fGB", raw_mb / 1024.0);
+    } else {
+        snprintf(buf, bufsize, "%.0fMB", raw_mb);
+    }
+}
+
+/*
+ * Output TOC table
+ */
+static void output_toc_table(const disc_info_t *disc)
+{
+    const toc_t *toc = &disc->toc;
+    
+    /* Table header */
+    printf("\n");
+    printf("         ----- Start -----  ----- Length -----\n");
+    printf("S#  T#        MSF      LBA       MSF       LBA  Type   Ch  Pre\n");
+    
+    /* Track rows */
+    for (int i = 0; i < toc->track_count; i++) {
+        const track_t *t = &toc->tracks[i];
+        
+        int start_m, start_s, start_f;
+        int len_m, len_s, len_f;
+        
+        /* Convert LBA to MSF (add 150 frames for 2-second offset) */
+        int32_t start_with_pregap = t->offset + PREGAP_FRAMES;
+        lba_to_msf(start_with_pregap, &start_m, &start_s, &start_f);
+        lba_to_msf(t->length, &len_m, &len_s, &len_f);
+        
+        const char *type_str = (t->type == TRACK_TYPE_AUDIO) ? "audio" : "data";
+        const char *ch_str = (t->type == TRACK_TYPE_AUDIO) ? "2" : "-";
+        
+        /* Preemphasis: check control nibble bit 0 */
+        const char *pre_str;
+        if (t->type == TRACK_TYPE_AUDIO) {
+            pre_str = (t->control & 0x01) ? "yes" : "no";
+        } else {
+            pre_str = "-";
+        }
+        
+        printf("%2d  %2d   %02d:%02d:%02d  %7d  %02d:%02d:%02d  %8d  %-5s  %2s  %s\n",
+               t->session, t->number,
+               start_m, start_s, start_f, t->offset,
+               len_m, len_s, len_f, t->length,
+               type_str, ch_str, pre_str);
+    }
+    
+    /* Leadout row */
+    int lo_m, lo_s, lo_f;
+    int32_t leadout_with_pregap = toc->leadout + PREGAP_FRAMES;
+    lba_to_msf(leadout_with_pregap, &lo_m, &lo_s, &lo_f);
+    
+    char size_buf[16];
+    format_disc_size(toc->leadout, size_buf, sizeof(size_buf));
+    
+    printf(" -  LO   %02d:%02d:%02d  %7d         -  %8s  -       -    -\n",
+           lo_m, lo_s, lo_f, toc->leadout, size_buf);
+}
+
+/*
  * Output Type mode
  */
 void output_type(const disc_info_t *disc)
 {
+    /* Disc type names */
     printf("%s\n", disc_type_name(disc->type));
     printf("%s\n", disc_type_tech_name(disc->type));
-    printf("%d tracks\n", disc->toc.track_count);
+    
+    /* Total track count (audio + data) */
+    int total_tracks = disc->toc.audio_count + disc->toc.data_count;
+    printf("%d track%s\n", total_tracks, total_tracks == 1 ? "" : "s");
     
     /* Track breakdown for non-standard CDs */
     if (disc->type == DISC_TYPE_ENHANCED || disc->type == DISC_TYPE_MIXED) {
@@ -68,6 +142,9 @@ void output_type(const disc_info_t *disc)
                disc->toc.audio_count, disc->toc.audio_count == 1 ? "" : "s",
                disc->toc.data_count, disc->toc.data_count == 1 ? "" : "s");
     }
+    
+    /* TOC table */
+    output_toc_table(disc);
 }
 
 /*

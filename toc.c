@@ -17,6 +17,7 @@ void toc_init(toc_t *toc)
 {
     memset(toc, 0, sizeof(*toc));
     toc->first_track = 1;
+    toc->last_session = 1;
 }
 
 /*
@@ -125,6 +126,7 @@ int toc_parse_musicbrainz(toc_t *toc, const char *input)
         }
         
         toc->tracks[i].number = track_num;
+        toc->tracks[i].session = 1;
         toc->tracks[i].offset = offset;
         toc->tracks[i].type = TRACK_TYPE_AUDIO;  /* Assume audio for MB format */
     }
@@ -211,6 +213,7 @@ int toc_parse_accuraterip(toc_t *toc, const char *input)
             return EX_DATAERR;
         
         toc->tracks[i].number = track_num;
+        toc->tracks[i].session = 1;
         toc->tracks[i].offset = offset;
         
         /* Determine track type based on first_audio:
@@ -296,6 +299,7 @@ int toc_parse_freedb(toc_t *toc, const char *input)
             return EX_DATAERR;
         
         toc->tracks[i].number = i + 1;
+        toc->tracks[i].session = 1;
         toc->tracks[i].offset = offset;
         toc->tracks[i].type = TRACK_TYPE_AUDIO;
     }

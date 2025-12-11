@@ -8,6 +8,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 
 /* SCSI command result */
 typedef struct {
@@ -110,5 +111,17 @@ const char *scsi_error(scsi_device_t *dev);
  */
 bool scsi_read_toc_control(scsi_device_t *dev, int *first_track, int *last_track,
                            uint8_t *control);
+
+/*
+ * Read raw CD-Text data using READ TOC/PMA/ATIP command (format 5)
+ *
+ * data: output pointer to allocated buffer (caller must free)
+ * len: output length of data in bytes
+ *
+ * Returns true on success, false on error or no CD-Text present
+ * On success, *data contains raw CD-Text packs (caller must free)
+ * On failure or no CD-Text, *data = NULL, *len = 0
+ */
+bool scsi_read_cdtext_raw(scsi_device_t *dev, uint8_t **data, size_t *len);
 
 #endif /* MBDISCID_SCSI_H */
