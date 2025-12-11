@@ -17,22 +17,22 @@ void toc_init(toc_t *toc);
  * Parse CDTOC input string according to format
  * Returns 0 on success, non-zero on error
  */
-int toc_parse(toc_t *toc, const char *input, toc_format_t format);
+int toc_parse(toc_t *toc, const char *input, toc_format_t format, int verbosity);
 
 /*
  * Parse MusicBrainz format: first last leadout offset1...offsetN
  */
-int toc_parse_musicbrainz(toc_t *toc, const char *input);
+int toc_parse_musicbrainz(toc_t *toc, const char *input, int verbosity);
 
 /*
  * Parse AccurateRip format: count audio first offset1...offsetN leadout
  */
-int toc_parse_accuraterip(toc_t *toc, const char *input);
+int toc_parse_accuraterip(toc_t *toc, const char *input, int verbosity);
 
 /*
  * Parse FreeDB format: count offset1...offsetN total_seconds
  */
-int toc_parse_freedb(toc_t *toc, const char *input);
+int toc_parse_freedb(toc_t *toc, const char *input, int verbosity);
 
 /*
  * Validate TOC consistency

@@ -54,15 +54,15 @@ static int parse_integers(const char *input, int32_t *vals, int max_vals)
 /*
  * Parse CDTOC input according to specified format
  */
-int toc_parse(toc_t *toc, const char *input, toc_format_t format)
+int toc_parse(toc_t *toc, const char *input, toc_format_t format, int verbosity)
 {
     switch (format) {
     case TOC_FORMAT_MUSICBRAINZ:
-        return toc_parse_musicbrainz(toc, input);
+        return toc_parse_musicbrainz(toc, input, verbosity);
     case TOC_FORMAT_ACCURATERIP:
-        return toc_parse_accuraterip(toc, input);
+        return toc_parse_accuraterip(toc, input, verbosity);
     case TOC_FORMAT_FREEDB:
-        return toc_parse_freedb(toc, input);
+        return toc_parse_freedb(toc, input, verbosity);
     default:
         return -1;
     }
@@ -72,7 +72,7 @@ int toc_parse(toc_t *toc, const char *input, toc_format_t format)
  * Parse MusicBrainz format: first last leadout offset1...offsetN
  * All values are frame counts (LBA + 150 pregap)
  */
-int toc_parse_musicbrainz(toc_t *toc, const char *input)
+int toc_parse_musicbrainz(toc_t *toc, const char *input, int verbosity)
 {
     int32_t vals[MAX_TRACKS + 4];
     int count = parse_integers(input, vals, MAX_TRACKS + 4);
@@ -145,6 +145,15 @@ int toc_parse_musicbrainz(toc_t *toc, const char *input)
     toc->audio_count = expected_offsets;
     toc->audio_leadout = toc->leadout;
 
+    /* Verbose output */
+    verbose(2, verbosity, "toc: user reports tracks %d-%d, leadout %d",
+            first, last, toc->leadout);
+    verbose(1, verbosity, "toc: %d tracks", toc->track_count);
+    for (int i = 0; i < toc->track_count; i++) {
+        verbose(2, verbosity, "toc: track %d: offset %d, length %d",
+                toc->tracks[i].number, toc->tracks[i].offset, toc->tracks[i].length);
+    }
+
     return 0;
 }
 
@@ -157,7 +166,7 @@ int toc_parse_musicbrainz(toc_t *toc, const char *input)
  * first = first AUDIO track number (track 1 may be data for Mixed Mode)
  * offsets = one for each track, starting from track 1
  */
-int toc_parse_accuraterip(toc_t *toc, const char *input)
+int toc_parse_accuraterip(toc_t *toc, const char *input, int verbosity)
 {
     int32_t vals[MAX_TRACKS + 5];
     int count = parse_integers(input, vals, MAX_TRACKS + 5);
@@ -247,6 +256,17 @@ int toc_parse_accuraterip(toc_t *toc, const char *input)
      * not to ID calculation from TOC data. */
     toc->audio_leadout = leadout;
 
+    /* Verbose output - AccurateRip format includes audio count */
+    verbose(2, verbosity, "toc: user reports tracks 1-%d, leadout %d",
+            track_count, leadout);
+    verbose(1, verbosity, "toc: %d tracks (%d audio, %d data)",
+            toc->track_count, toc->audio_count, toc->data_count);
+    for (int i = 0; i < toc->track_count; i++) {
+        verbose(2, verbosity, "toc: track %d: offset %d, length %d, %s",
+                toc->tracks[i].number, toc->tracks[i].offset, toc->tracks[i].length,
+                toc->tracks[i].type == TRACK_TYPE_DATA ? "data" : "audio");
+    }
+
     return 0;
 }
 
@@ -254,7 +274,7 @@ int toc_parse_accuraterip(toc_t *toc, const char *input)
  * Parse FreeDB format: count offset1...offsetN total_seconds
  * Offsets include +150 pregap adjustment
  */
-int toc_parse_freedb(toc_t *toc, const char *input)
+int toc_parse_freedb(toc_t *toc, const char *input, int verbosity)
 {
     int32_t vals[MAX_TRACKS + 3];
     int count = parse_integers(input, vals, MAX_TRACKS + 3);
@@ -315,6 +335,15 @@ int toc_parse_freedb(toc_t *toc, const char *input)
         toc->tracks[i].length = toc->tracks[i + 1].offset - toc->tracks[i].offset;
     }
     toc->tracks[track_count - 1].length = toc->leadout - toc->tracks[track_count - 1].offset;
+
+    /* Verbose output */
+    verbose(2, verbosity, "toc: user reports tracks 1-%d, leadout %d",
+            track_count, toc->leadout);
+    verbose(1, verbosity, "toc: %d tracks", toc->track_count);
+    for (int i = 0; i < toc->track_count; i++) {
+        verbose(2, verbosity, "toc: track %d: offset %d, length %d",
+                toc->tracks[i].number, toc->tracks[i].offset, toc->tracks[i].length);
+    }
 
     return 0;
 }

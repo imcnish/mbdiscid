@@ -438,9 +438,13 @@ void scsi_close(scsi_device_t *dev)
             wait_count++;
             usleep(100000);  /* 100ms */
         }
-        if (dev->verbosity >= 2 && wait_count > 0) {
-            fprintf(stderr, "device: waited %d.%ds for device release\n",
-                    wait_count / 10, wait_count % 10);
+        if (dev->verbosity >= 1) {
+            if (wait_count > 0) {
+                fprintf(stderr, "scsi: waited %d.%ds for device release\n",
+                        wait_count / 10, wait_count % 10);
+            } else {
+                fprintf(stderr, "scsi: device released immediately\n");
+            }
         }
     }
 

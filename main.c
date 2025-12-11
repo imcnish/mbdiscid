@@ -142,7 +142,7 @@ int main(int argc, char **argv)
         }
 
         toc_format_t format = cli_get_toc_format(opts.mode);
-        ret = toc_parse(&disc.toc, toc_str, format);
+        ret = toc_parse(&disc.toc, toc_str, format, opts.verbosity);
         free(stdin_toc);
 
         if (ret != 0) {
