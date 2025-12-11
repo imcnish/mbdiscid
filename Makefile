@@ -6,7 +6,7 @@ UNAME := $(shell uname -s)
 
 # Compiler and flags
 CC = gcc
-CFLAGS = -Wall -Wextra -std=c11 -O2
+CFLAGS = -Wall -Wextra -std=c11 -O2 -D_POSIX_C_SOURCE=200809L
 
 # Platform-specific settings
 ifeq ($(UNAME),Darwin)

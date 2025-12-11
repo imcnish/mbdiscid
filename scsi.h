@@ -113,6 +113,29 @@ bool scsi_read_toc_control(scsi_device_t *dev, int *first_track, int *last_track
                            uint8_t *control);
 
 /*
+ * Read Full TOC (format 2) to get complete track info including multi-session
+ *
+ * Full TOC provides:
+ *   - Track numbers, offsets, and control bytes
+ *   - Session information for each track
+ *   - Per-session leadout positions
+ *
+ * Parameters:
+ *   first_track: output - first track number
+ *   last_track: output - last track number
+ *   control: output array[100] - control nibble for each track (index 1-99)
+ *   session: output array[100] - session number for each track (index 1-99)
+ *   offsets: output array[100] - LBA offset for each track (index 1-99)
+ *   session_leadouts: output array[10] - leadout LBA for each session (index 0-9)
+ *   last_session: output - highest session number
+ *
+ * Returns true on success, false on error
+ */
+bool scsi_read_full_toc(scsi_device_t *dev, int *first_track, int *last_track,
+                        uint8_t *control, uint8_t *session, int32_t *offsets,
+                        int32_t *session_leadouts, int *last_session);
+
+/*
  * Read raw CD-Text data using READ TOC/PMA/ATIP command (format 5)
  *
  * data: output pointer to allocated buffer (caller must free)

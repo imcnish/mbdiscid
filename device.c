@@ -103,7 +103,7 @@ static bool read_full_toc_ioctl(const char *device, int *first_track,
             /* Convert MSF to LBA: (M*60 + S)*75 + F - 150 */
             int32_t lba = ((int32_t)desc->pmin * 60 + desc->psec) * 75 + desc->pframe - 150;
             offsets[point] = lba;
-            
+
             if (point < *first_track) *first_track = point;
             if (point > *last_track) *last_track = point;
         }
@@ -280,16 +280,15 @@ int device_read_toc(const char *device, toc_t *toc, int verbosity)
                 scsi_first, scsi_last, last_session);
     }
 #else
-    /* On Linux, use SCSI */
+    /* On Linux, use SCSI Full TOC (format 2) */
     scsi_device_t *scsi = scsi_open(device);
     if (scsi) {
-        have_full_toc = scsi_read_toc_control(scsi, &scsi_first, &scsi_last, track_control);
+        have_full_toc = scsi_read_full_toc(scsi, &scsi_first, &scsi_last,
+                                            track_control, track_session, track_offsets,
+                                            session_leadouts, &last_session);
         if (have_full_toc) {
-            verbose(2, verbosity, "toc: SCSI reports tracks %d-%d", scsi_first, scsi_last);
-            /* Linux path doesn't get session info from basic TOC - use libdiscid range */
-            for (int t = scsi_first; t <= scsi_last; t++) {
-                track_session[t] = 1;  /* Default to session 1 */
-            }
+            verbose(2, verbosity, "toc: full TOC reports tracks %d-%d, %d session(s)",
+                    scsi_first, scsi_last, last_session);
         }
         scsi_close(scsi);
     }
@@ -298,7 +297,7 @@ int device_read_toc(const char *device, toc_t *toc, int verbosity)
     /* Determine actual track range (use SCSI if available and has more tracks) */
     int actual_first = libdiscid_first;
     int actual_last = (have_full_toc && scsi_last > libdiscid_last) ? scsi_last : libdiscid_last;
-    
+
     toc->first_track = actual_first;
     toc->last_track = actual_last;
     toc->last_session = last_session;
@@ -311,7 +310,7 @@ int device_read_toc(const char *device, toc_t *toc, int verbosity)
     for (int t = actual_first; t <= actual_last; t++) {
         track_t *track = &toc->tracks[track_idx];
         track->number = t;
-        
+
         /* Get offset - prefer SCSI if available, fall back to libdiscid */
         if (have_full_toc && track_offsets[t] != 0) {
             track->offset = track_offsets[t];
@@ -321,14 +320,14 @@ int device_read_toc(const char *device, toc_t *toc, int verbosity)
             /* Track not in libdiscid range - must use SCSI offset */
             track->offset = track_offsets[t];
         }
-        
+
         /* Session number */
         track->session = have_full_toc ? track_session[t] : 1;
         if (track->session == 0) track->session = 1;
-        
+
         /* Control nibble */
         track->control = have_full_toc ? track_control[t] : 0;
-        
+
         /* Determine track type from control byte (bit 2: 0=audio, 1=data) */
         if (have_full_toc && (track_control[t] & 0x04)) {
             track->type = TRACK_TYPE_DATA;
@@ -337,10 +336,10 @@ int device_read_toc(const char *device, toc_t *toc, int verbosity)
             track->type = TRACK_TYPE_AUDIO;
             audio_count++;
         }
-        
+
         /* ISRC will be read via raw SCSI later */
         track->isrc[0] = '\0';
-        
+
         track_idx++;
     }
 
@@ -359,7 +358,7 @@ int device_read_toc(const char *device, toc_t *toc, int verbosity)
     /* For Enhanced CDs: audio_leadout = start of first data track (end of audio session) */
     /* For other discs: audio_leadout = disc leadout */
     toc->audio_leadout = toc->leadout;
-    
+
     if (last_session > 1 && have_full_toc) {
         /* Multi-session disc - audio leadout is session 1 leadout */
         if (session_leadouts[0] > 0) {

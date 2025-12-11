@@ -26,6 +26,7 @@
 
 /* READ TOC format codes */
 #define TOC_FORMAT_TOC      0x00
+#define TOC_FORMAT_FULL     0x02
 #define TOC_FORMAT_CDTEXT   0x05
 
 /* Timeout in milliseconds */
@@ -459,7 +460,7 @@ bool scsi_read_mcn(scsi_device_t *dev, char *mcn)
 }
 
 /*
- * Read TOC to get track control bytes
+ * Read TOC to get track control bytes (basic TOC format 0)
  */
 bool scsi_read_toc_control(scsi_device_t *dev, int *first_track, int *last_track,
                            uint8_t *control)
@@ -506,6 +507,144 @@ bool scsi_read_toc_control(scsi_device_t *dev, int *first_track, int *last_track
         if (track_num < 100) {
             control[track_num] = ctrl;
         }
+    }
+
+    return true;
+}
+
+/*
+ * Read Full TOC (format 2) to get complete track info including multi-session
+ *
+ * Full TOC format returns 11-byte descriptors:
+ *   Byte 0: Session number
+ *   Byte 1: ADR (high nibble) | CONTROL (low nibble)
+ *   Byte 2: TNO (always 0 in Full TOC)
+ *   Byte 3: POINT (track number or special: A0, A1, A2)
+ *   Bytes 4-6: MIN, SEC, FRAME (running time in track)
+ *   Byte 7: Zero
+ *   Bytes 8-10: PMIN, PSEC, PFRAME (start position for tracks, or special data)
+ *
+ * Special POINT values:
+ *   A0: PMIN = first track number in session
+ *   A1: PMIN = last track number in session
+ *   A2: PMIN/PSEC/PFRAME = leadout position for session
+ *
+ * Populates:
+ *   - first_track, last_track: track range
+ *   - control[]: control nibble for each track (index 1-99)
+ *   - session[]: session number for each track (index 1-99)
+ *   - offsets[]: LBA offset for each track (index 1-99)
+ *   - session_leadouts[]: leadout LBA for each session (index 0-9 for sessions 1-10)
+ *   - last_session: highest session number
+ *
+ * Returns true on success, false on error
+ */
+bool scsi_read_full_toc(scsi_device_t *dev, int *first_track, int *last_track,
+                        uint8_t *control, uint8_t *session, int32_t *offsets,
+                        int32_t *session_leadouts, int *last_session)
+{
+    unsigned char cdb[10];
+    unsigned char buf[1104];  /* 4-byte header + up to 100 descriptors * 11 bytes */
+    unsigned char sense[32];
+
+    if (!dev || dev->fd < 0) {
+        return false;
+    }
+
+    /* Initialize outputs */
+    memset(control, 0, 100);
+    memset(session, 0, 100);
+    memset(offsets, 0, 100 * sizeof(int32_t));
+    memset(session_leadouts, 0, 10 * sizeof(int32_t));
+    *first_track = 99;
+    *last_track = 1;
+    *last_session = 1;
+
+    memset(cdb, 0, sizeof(cdb));
+    cdb[0] = READ_TOC;
+    cdb[1] = 0x02;            /* MSF format bit (we'll convert to LBA) */
+    cdb[2] = TOC_FORMAT_FULL; /* Format 2 = Full TOC */
+    cdb[6] = 1;               /* Starting session */
+    cdb[7] = (sizeof(buf) >> 8) & 0xFF;
+    cdb[8] = sizeof(buf) & 0xFF;
+
+    memset(buf, 0, sizeof(buf));
+    memset(sense, 0, sizeof(sense));
+
+    if (scsi_cmd(dev, cdb, sizeof(cdb), buf, sizeof(buf), sense, sizeof(sense)) < 0) {
+        return false;
+    }
+
+    /* Parse Full TOC header */
+    uint16_t toc_len = ((uint16_t)buf[0] << 8) | buf[1];
+
+    if (toc_len < 2) {
+        return false;
+    }
+
+    /* buf[2] = first session, buf[3] = last session (from header) */
+    *last_session = buf[3];
+    if (*last_session < 1) *last_session = 1;
+    if (*last_session > 10) *last_session = 10;
+
+    /* Parse Full TOC descriptors (11 bytes each, starting at byte 4) */
+    int desc_count = (toc_len - 2) / 11;
+
+    for (int i = 0; i < desc_count && i < 100; i++) {
+        int offset = 4 + i * 11;
+
+        uint8_t sess = buf[offset + 0];
+        uint8_t ctrl_adr = buf[offset + 1];
+        uint8_t point = buf[offset + 3];
+        uint8_t pmin = buf[offset + 8];
+        uint8_t psec = buf[offset + 9];
+        uint8_t pframe = buf[offset + 10];
+
+        /* Track session for last_session calculation */
+        if (sess > *last_session && sess <= 10) {
+            *last_session = sess;
+        }
+
+        /* Track entries have POINT = 1-99 */
+        if (point >= 1 && point <= 99) {
+            control[point] = ctrl_adr & 0x0F;  /* CONTROL is low nibble */
+            session[point] = sess;
+
+            /* Convert MSF to LBA: (M*60 + S)*75 + F - 150 */
+            int32_t lba = ((int32_t)pmin * 60 + psec) * 75 + pframe - 150;
+            offsets[point] = lba;
+
+            if (point < *first_track) *first_track = point;
+            if (point > *last_track) *last_track = point;
+        }
+        /* A0 entry: PMIN contains first track of session */
+        else if (point == 0xA0) {
+            uint8_t session_first = pmin;
+            if (session_first >= 1 && session_first <= 99) {
+                if (session_first < *first_track) *first_track = session_first;
+            }
+        }
+        /* A1 entry: PMIN contains last track of session */
+        else if (point == 0xA1) {
+            uint8_t session_last = pmin;
+            if (session_last >= 1 && session_last <= 99) {
+                if (session_last > *last_track) *last_track = session_last;
+            }
+        }
+        /* A2 entry: leadout position for this session */
+        else if (point == 0xA2) {
+            int32_t leadout_lba = ((int32_t)pmin * 60 + psec) * 75 + pframe - 150;
+            if (sess >= 1 && sess <= 10) {
+                session_leadouts[sess - 1] = leadout_lba;
+            }
+        }
+    }
+
+    /* Validate we found something */
+    if (*first_track > *last_track) {
+        *first_track = 1;
+        *last_track = 1;
+        return false;
     }
 
     return true;
