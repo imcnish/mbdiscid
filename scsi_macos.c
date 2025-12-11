@@ -54,6 +54,7 @@ struct scsi_device {
     /* BSD device for fallback ioctls */
     int fd;
     char bsd_name[64];  /* For polling on close */
+    int verbosity;
 
     char error[256];
 };
@@ -427,13 +428,19 @@ void scsi_close(scsi_device_t *dev)
      * accessible again before returning, so the next scsi_open() can succeed.
      */
     if (dev->da_claimed && dev->bsd_name[0]) {
+        int wait_count = 0;
         for (int i = 0; i < 100; i++) {  /* Up to 10 seconds */
             int test_fd = open(dev->bsd_name, O_RDONLY | O_NONBLOCK);
             if (test_fd >= 0) {
                 close(test_fd);
                 break;
             }
+            wait_count++;
             usleep(100000);  /* 100ms */
+        }
+        if (dev->verbosity >= 2 && wait_count > 0) {
+            fprintf(stderr, "device: waited %d.%ds for device release\n",
+                    wait_count / 10, wait_count % 10);
         }
     }
 
@@ -443,6 +450,13 @@ void scsi_close(scsi_device_t *dev)
 const char *scsi_error(scsi_device_t *dev)
 {
     return dev ? dev->error : "no device";
+}
+
+void scsi_set_verbosity(scsi_device_t *dev, int verbosity)
+{
+    if (dev) {
+        dev->verbosity = verbosity;
+    }
 }
 
 /*

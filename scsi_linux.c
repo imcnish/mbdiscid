@@ -34,6 +34,7 @@
 
 struct scsi_device {
     int fd;
+    int verbosity;
     char error[256];
 };
 
@@ -81,6 +82,13 @@ void scsi_close(scsi_device_t *dev)
 const char *scsi_error(scsi_device_t *dev)
 {
     return dev ? dev->error : "null device";
+}
+
+void scsi_set_verbosity(scsi_device_t *dev, int verbosity)
+{
+    if (dev) {
+        dev->verbosity = verbosity;
+    }
 }
 
 /*

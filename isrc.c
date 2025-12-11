@@ -140,12 +140,12 @@ static char *collector_format_candidates(isrc_collector_t *c)
     if (c->num_candidates == 0) {
         return xstrdup("(none)");
     }
-    
+
     /* Estimate buffer size: 12 chars ISRC + "×" + count + ", " per candidate */
     size_t bufsize = c->num_candidates * 24;
     char *buf = xmalloc(bufsize);
     buf[0] = '\0';
-    
+
     for (int i = 0; i < c->num_candidates; i++) {
         char entry[32];
         snprintf(entry, sizeof(entry), "%s×%d", c->candidates[i].isrc, c->candidates[i].count);
@@ -154,7 +154,7 @@ static char *collector_format_candidates(isrc_collector_t *c)
         }
         strcat(buf, entry);
     }
-    
+
     return buf;
 }
 
@@ -341,14 +341,14 @@ static bool read_track_isrc(scsi_device_t *dev, track_t *track, int verbosity)
             if (winner) {
                 strncpy(track->isrc, winner, 12);
                 track->isrc[12] = '\0';
-                
+
                 /* Log all candidates at level 3 before returning */
                 if (verbosity >= 3 && collector.num_candidates > 0) {
                     char *candidates = collector_format_candidates(&collector);
                     verbose(3, verbosity, "isrc: track %d: candidates: %s", track->number, candidates);
                     free(candidates);
                 }
-                
+
                 verbose(2, verbosity, "isrc: track %d: %s (early, %d/%d)",
                         track->number, track->isrc,
                         collector.candidates[0].count, collector.total_valid);
@@ -406,14 +406,14 @@ static bool read_track_isrc(scsi_device_t *dev, track_t *track, int verbosity)
             if (winner) {
                 strncpy(track->isrc, winner, 12);
                 track->isrc[12] = '\0';
-                
+
                 /* Log all candidates at level 3 */
                 if (verbosity >= 3 && collector.num_candidates > 0) {
                     char *candidates = collector_format_candidates(&collector);
                     verbose(3, verbosity, "isrc: track %d: candidates: %s", track->number, candidates);
                     free(candidates);
                 }
-                
+
                 verbose(2, verbosity, "isrc: track %d: %s (rescue, %d/%d)",
                         track->number, track->isrc,
                         collector.candidates[0].count, collector.total_valid);
@@ -451,6 +451,8 @@ int isrc_read_disc(toc_t *toc, const char *device, int verbosity)
         verbose(1, verbosity, "isrc: failed to open device");
         return -1;
     }
+
+    scsi_set_verbosity(dev, verbosity);
 
     int found_count = 0;
 

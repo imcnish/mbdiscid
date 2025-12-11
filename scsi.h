@@ -46,6 +46,11 @@ scsi_device_t *scsi_open(const char *device);
 void scsi_close(scsi_device_t *dev);
 
 /*
+ * Set verbosity level for SCSI operations
+ */
+void scsi_set_verbosity(scsi_device_t *dev, int verbosity);
+
+/*
  * Read raw Q-subchannel data at a specific LBA
  * Uses READ CD command (0xBE) with subchannel selector
  *
