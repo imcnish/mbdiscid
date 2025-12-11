@@ -10,13 +10,11 @@ CFLAGS = -Wall -Wextra -std=c11 -O2
 
 # Platform-specific settings
 ifeq ($(UNAME),Darwin)
-    PLATFORM = MACOS
     CFLAGS += -DPLATFORM_MACOS
     LDFLAGS = -framework CoreFoundation -framework IOKit -framework DiskArbitration
     LIBS = -ldiscid
     SCSI_SRC = scsi_macos.c
 else
-    PLATFORM = LINUX
     CFLAGS += -DPLATFORM_LINUX
     LDFLAGS =
     LIBS = -ldiscid
@@ -28,13 +26,14 @@ ifdef DEBUG
     CFLAGS += -g -O0 -DDEBUG
 endif
 
-# Version (use MBDISCID_VERSION to avoid conflict with IOKit headers)
+# Version
 MBDISCID_VERSION ?= 1.1.0b
 CFLAGS += -DMBDISCID_VERSION=\"$(MBDISCID_VERSION)\"
 
-# Source files (platform-specific SCSI)
-SOURCES = main.c cli.c device.c toc.c discid.c output.c util.c $(SCSI_SRC) cdtext.c isrc.c
-HEADERS = types.h cli.h device.h toc.h discid.h output.h util.h scsi.h cdtext.h isrc.h
+# Source and header files
+SCSI_EXCLUDE = scsi_macos.c scsi_linux.c
+SOURCES = $(filter-out $(SCSI_EXCLUDE), $(wildcard *.c)) $(SCSI_SRC)
+HEADERS = $(wildcard *.h)
 OBJECTS = $(SOURCES:.c=.o)
 
 # Target
@@ -47,7 +46,7 @@ all: $(TARGET)
 $(TARGET): $(OBJECTS)
 	$(CC) $(OBJECTS) -o $@ $(LDFLAGS) $(LIBS)
 
-# Compile
+# Compile - rebuild if any header changes
 %.o: %.c $(HEADERS)
 	$(CC) $(CFLAGS) -c $< -o $@
 
@@ -70,5 +69,4 @@ uninstall:
 test: $(TARGET)
 	./test.sh
 
-# Phony targets
 .PHONY: all clean install uninstall test

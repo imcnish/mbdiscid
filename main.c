@@ -139,14 +139,6 @@ int main(int argc, char **argv)
     } else {
         /* Read from device */
         const char *device = opts.device;
-        if (!device) {
-            device = device_get_default();
-        }
-
-        if (!device) {
-            error_quiet(opts.quiet, "no device specified and no default device found");
-            return EX_USAGE;
-        }
 
         /* Determine what to read based on mode */
         int flags = 0;

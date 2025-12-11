@@ -195,6 +195,12 @@ int cli_validate(const options_t *opts)
     if (opts->help || opts->version || opts->list_drives)
         return 0;
 
+    /* Must have device or -c */
+    if (!opts->calculate && !opts->device) {
+        cli_print_help();
+        return EX_USAGE;
+    }
+
     /* -c with disc-required modes */
     if (opts->calculate) {
         if (opts->mode == MODE_TYPE || opts->mode == MODE_TEXT ||
@@ -224,11 +230,6 @@ int cli_validate(const options_t *opts)
             error_quiet(opts->quiet, "-u/-o not supported for this mode");
             return EX_USAGE;
         }
-    }
-
-    /* Need either device or -c (or stdin for -c) */
-    if (!opts->calculate && !opts->device) {
-        /* Will read from device - but we'll check this later when we know the mode */
     }
 
     return 0;
