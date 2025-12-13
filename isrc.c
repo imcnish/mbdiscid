@@ -21,9 +21,13 @@
 #define SHORT_TRACK_THRESHOLD ((2 * BOOKEND_FRAMES) + ((INITIAL_TRANCHES + RESCUE_TRANCHES + 1) * FRAMES_PER_TRANCHE))
 #define EARLY_STOP_VALID_FRAMES 64
 
+#define MAX_LBAS_PER_CANDIDATE 16
+
 typedef struct {
     char isrc[13];
     int count;
+    int32_t lbas[MAX_LBAS_PER_CANDIDATE];  /* Sample of LBAs where found */
+    int lba_count;
 } isrc_candidate_t;
 
 typedef struct {
@@ -31,6 +35,7 @@ typedef struct {
     int num_candidates;
     int total_valid;
     int total_read;
+    int32_t track_offset;  /* For computing relative positions */
 } isrc_collector_t;
 
 bool isrc_validate(const char *isrc)
@@ -78,7 +83,7 @@ static bool is_short_track(const track_t *track)
     return track->length < SHORT_TRACK_THRESHOLD;
 }
 
-static void collector_add(isrc_collector_t *c, const char *isrc)
+static void collector_add(isrc_collector_t *c, const char *isrc, int32_t lba)
 {
     if (!isrc_validate(isrc)) {
         return;
@@ -89,6 +94,9 @@ static void collector_add(isrc_collector_t *c, const char *isrc)
     for (int i = 0; i < c->num_candidates; i++) {
         if (strcmp(c->candidates[i].isrc, isrc) == 0) {
             c->candidates[i].count++;
+            if (c->candidates[i].lba_count < MAX_LBAS_PER_CANDIDATE) {
+                c->candidates[i].lbas[c->candidates[i].lba_count++] = lba;
+            }
             return;
         }
     }
@@ -97,6 +105,8 @@ static void collector_add(isrc_collector_t *c, const char *isrc)
         strncpy(c->candidates[c->num_candidates].isrc, isrc, 12);
         c->candidates[c->num_candidates].isrc[12] = '\0';
         c->candidates[c->num_candidates].count = 1;
+        c->candidates[c->num_candidates].lbas[0] = lba;
+        c->candidates[c->num_candidates].lba_count = 1;
         c->num_candidates++;
     }
 }
@@ -156,6 +166,43 @@ static char *collector_format_candidates(isrc_collector_t *c)
     }
 
     return buf;
+}
+
+/*
+ * Print LBA positions for each candidate (verbosity >= 3)
+ * Format: relative/absolute for each position
+ */
+static void collector_print_positions(isrc_collector_t *c, int track_number, int verbosity)
+{
+    if (verbosity < 3 || c->num_candidates == 0) {
+        return;
+    }
+
+    for (int i = 0; i < c->num_candidates; i++) {
+        isrc_candidate_t *cand = &c->candidates[i];
+
+        /* Build position string */
+        char positions[256];
+        positions[0] = '\0';
+        int pos = 0;
+
+        for (int j = 0; j < cand->lba_count && pos < 240; j++) {
+            int32_t abs_lba = cand->lbas[j];
+            int32_t rel_lba = abs_lba - c->track_offset;
+            if (j > 0) {
+                pos += snprintf(positions + pos, sizeof(positions) - pos, ", ");
+            }
+            pos += snprintf(positions + pos, sizeof(positions) - pos, "%d/%d", rel_lba, abs_lba);
+        }
+
+        if (cand->count > cand->lba_count) {
+            snprintf(positions + pos, sizeof(positions) - pos, " (+%d more)",
+                     cand->count - cand->lba_count);
+        }
+
+        verbose(3, verbosity, "isrc: track %d: %s: found at: %s",
+                track_number, cand->isrc, positions);
+    }
 }
 
 static int select_probe_tracks(const toc_t *toc, int *probe_indices, int verbosity)
@@ -236,6 +283,7 @@ static void calculate_tranche_positions(const track_t *track, int num_tranches,
 static bool read_track_isrc(scsi_device_t *dev, track_t *track, int verbosity)
 {
     isrc_collector_t collector = {0};
+    collector.track_offset = track->offset;
     int crc_valid_count = 0;
     int crc_invalid_count = 0;
     int adr_counts[4] = {0};
@@ -265,7 +313,7 @@ static bool read_track_isrc(scsi_device_t *dev, track_t *track, int verbosity)
                     crc_invalid_count++;
                 }
                 if (q->crc_valid && q->has_isrc) {
-                    collector_add(&collector, q->isrc);
+                    collector_add(&collector, q->isrc, track->offset + i);
                 }
             }
         } else {
@@ -278,6 +326,7 @@ static bool read_track_isrc(scsi_device_t *dev, track_t *track, int verbosity)
             char *candidates = collector_format_candidates(&collector);
             verbose(3, verbosity, "isrc: track %d: candidates: %s", track->number, candidates);
             free(candidates);
+            collector_print_positions(&collector, track->number, verbosity);
         }
 
         const char *winner = collector_get_majority(&collector);
@@ -328,7 +377,7 @@ static bool read_track_isrc(scsi_device_t *dev, track_t *track, int verbosity)
                     crc_invalid_count++;
                 }
                 if (q->crc_valid && q->has_isrc) {
-                    collector_add(&collector, q->isrc);
+                    collector_add(&collector, q->isrc, base_lba + f);
                 }
             }
         } else {
@@ -347,6 +396,7 @@ static bool read_track_isrc(scsi_device_t *dev, track_t *track, int verbosity)
                     char *candidates = collector_format_candidates(&collector);
                     verbose(3, verbosity, "isrc: track %d: candidates: %s", track->number, candidates);
                     free(candidates);
+                    collector_print_positions(&collector, track->number, verbosity);
                 }
 
                 verbose(2, verbosity, "isrc: track %d: %s (early, %d/%d)",
@@ -363,6 +413,7 @@ static bool read_track_isrc(scsi_device_t *dev, track_t *track, int verbosity)
         char *candidates = collector_format_candidates(&collector);
         verbose(3, verbosity, "isrc: track %d: candidates: %s", track->number, candidates);
         free(candidates);
+        collector_print_positions(&collector, track->number, verbosity);
     }
 
     const char *winner = collector_get_majority(&collector);
@@ -394,7 +445,7 @@ static bool read_track_isrc(scsi_device_t *dev, track_t *track, int verbosity)
                     q_subchannel_t *qp = &batch[f];
 
                     if (qp->crc_valid && qp->has_isrc) {
-                        collector_add(&collector, qp->isrc);
+                        collector_add(&collector, qp->isrc, base_lba + f);
                     }
                 }
             } else {
@@ -412,6 +463,7 @@ static bool read_track_isrc(scsi_device_t *dev, track_t *track, int verbosity)
                     char *candidates = collector_format_candidates(&collector);
                     verbose(3, verbosity, "isrc: track %d: candidates: %s", track->number, candidates);
                     free(candidates);
+                    collector_print_positions(&collector, track->number, verbosity);
                 }
 
                 verbose(2, verbosity, "isrc: track %d: %s (rescue, %d/%d)",
