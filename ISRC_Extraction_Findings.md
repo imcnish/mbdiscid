@@ -77,13 +77,12 @@ To test whether tool failures are deterministic or random, each disc was read 5 
 
 ### Failure Modes
 
-ISRC extraction failures fall into four categories, distinguished by whether the tool or the disc is at fault:
+ISRC extraction failures fall into three categories, distinguished by whether the tool or the disc is at fault:
 
 | Category | Mechanism | Tool Error? | Detected In Test Data |
 |----------|-----------|-------------|----------------------|
 | **False Negative** | Tool fails to read existing ISRC | Yes | Common (cdrdao, icedax, cd-info) |
-| **Mastering Defect** | Disc has wrong ISRC encoded; tools read it faithfully | No | 1 case (Sublime Track 6) |
-| **Track Boundary Bleed-Over** | Subchannel timing ambiguity at track transitions | No | 1 case (sr5 Track 6) |
+| **Mastering Defect** | Disc has incorrect/ambiguous ISRC data encoded; tools read it faithfully | No | 2 confirmed cases (Sublime Tracks 6, 15) |
 | **Transient Bit Corruption** | Corrupted read produces valid-format but wrong ISRC | Unclear | 1 case (development testing) |
 
 #### False Negatives
@@ -121,24 +120,22 @@ Key observations:
 - **mbdiscid detected all 149 tracks**, including those missed by all other tools
 - Combined cdrdao+icedax union coverage: ~98.7% (147/149)
 
-#### Mastering Defect
+#### Mastering Defects
 
-The physical disc contains incorrect ISRC data. Tools faithfully read what's there, but "what's there" is wrong.
+The physical disc contains incorrect or ambiguous ISRC data. Tools faithfully read what's encoded, but the encoded data is wrong. No tool or drive can "fix" these issues—they're baked into the disc. mbdiscid's distributed sampling and consensus voting mitigates most mastering defects by outvoting bad frames.
 
-**Sublime Track 6:** Three tools (cdrdao, icedax, mbdiscid) reported `USGA19648331` for Track 6—which is Track 5's ISRC ("April 29, 1992"). cd-info reported `USGA19649253`. Verification against the IFPI database confirmed cd-info's value is correct for "Santeria." The disc itself has corrupted subcode for Track 6; most tools accurately read the bad data. This demonstrates that **majority agreement doesn't guarantee correctness** when the disc has defective mastering.
+**Subtype: Track Boundary Bleed-Over**
 
-#### Track Boundary Bleed-Over
+The previous track's ISRC persists into the early frames of the next track. Tools sampling early in the track read stale data; tools sampling later read the correct value.
 
-A subchannel timing ambiguity at track transitions where tools sample different (valid) frames and get different results.
-
-**Sublime disc (sr5):** Two instances of bleed-over were identified:
+**Sublime disc (m.wjLfLe7XrMz1c_iAL6qo06Q4w-):** Two instances of bleed-over were identified:
 
 | Track | Reported ISRC | Correct ISRC | Source Track |
 |-------|---------------|--------------|--------------|
 | Track 6 | USGA19648331 | USGA19649253 | Track 5 |
 | Track 15 | USGA19649261 | USGA19649256 | Track 14 |
 
-For Track 6, cdrdao and icedax reported Track 5's ISRC, while mbdiscid and cd-info reported the correct Track 6 ISRC (verified against IFPI database). Each tool was 100% internally consistent across all 5 runs.
+For Track 6, cdrdao and icedax reported Track 5's ISRC ("April 29, 1992"), while mbdiscid and cd-info reported the correct Track 6 ISRC ("Santeria", verified against IFPI database). Each tool was 100% internally consistent across all 5 runs—the disagreement was deterministic, not random.
 
 **Independent confirmation via drutil:** macOS's native `drutil subchannel` command (macOS Sequoia 15.7.1, Apple SuperDrive, CoreAudio-based — different OS, different drive, different codebase from all Linux testing) confirms both bleed-over cases are encoded on the disc itself:
 
@@ -150,13 +147,17 @@ Track 14 ISRC: USGA19649261  (from block 40)
 Track 15 ISRC: USGA19649261  (from block 12)
 ```
 
-The block offsets are informative: Track 6's ISRC was found at block 42 (~0.5 seconds into the track), confirming that the wrong ISRC persists into the early portion of the track. Tools sampling from this region read the lingering previous-track ISRC; tools sampling later read the intended value.
+The block offsets are informative: Track 6's ISRC was found at block 42 (~0.5 seconds into the track), confirming that the wrong ISRC persists into the early portion of the track.
 
-This demonstrates that **100% tool consistency doesn't guarantee tool agreement** when subchannel data has timing edge cases. For practical ISRC extraction, when tools disagree on a specific track, checking whether the "wrong" value matches an adjacent track's ISRC can help distinguish bleed-over from other failure modes.
+This demonstrates that **majority agreement doesn't guarantee correctness** and **100% tool consistency doesn't guarantee tool agreement** when discs have defective mastering. For practical ISRC extraction, when tools disagree on a specific track, checking whether the "wrong" value matches an adjacent track's ISRC can help identify bleed-over.
+
+**Subtype: Mid-Track Corruption**
+
+Isolated incorrect ISRC frames interspersed with correct frames within a track's normal region (not at boundaries). During mbdiscid development, cases were observed where a track contained a sequence like `... <correct> ... <correct> ... <incorrect> ... <correct> ...` where the incorrect value was valid format, passed CRC, but did not exist in the IFPI database. mbdiscid's consensus voting mitigates this by requiring multiple agreeing frames.
 
 #### Transient Bit Corruption
 
-A valid-format but incorrect ISRC produced by corrupted subchannel data.
+A valid-format but incorrect ISRC produced by corrupted subchannel data during reading.
 
 **USWB19800782 → VTXC19Q00782:** During development testing (same drives, same disc corpus, prior to formal test protocol), one read returned `VTXC19Q00782` instead of the correct `USWB19800782`. The corrupted value passed format validation but does not exist in any ISRC database. This failure was not reproduced in the formal 16-disc test corpus. The Q subchannel lacks error correction, making such corruption theoretically possible; this observation motivated implementing CRC-16 validation in mbdiscid.
 
@@ -217,5 +218,3 @@ This eliminates the random failures inherent in single-read strategies and mitig
 - **Phase 1**: Single read per disc per tool
 - **Phase 2**: 5 consecutive reads per disc per tool (1-second intervals)
 - **Ground truth**: Consensus across all tools plus verification against MusicBrainz database entries where available
-
-Raw test data is available in [`test-data/isrc-comparison/`](test-data/isrc-comparison/).
