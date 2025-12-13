@@ -1,5 +1,7 @@
 /*
  * mbdiscid - Disc ID calculator
+ * Copyright (C) 2025 Ian McNish
+ * SPDX-License-Identifier: GPL-3.0-or-later
  * scsi_macos.c - macOS implementation using SCSITaskDeviceInterface
  *
  * This uses IOKit's SCSITaskDeviceInterface to send SCSI commands directly

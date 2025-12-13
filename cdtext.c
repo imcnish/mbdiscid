@@ -1,5 +1,7 @@
 /*
  * mbdiscid - Disc ID calculator
+ * Copyright (C) 2025 Ian McNish
+ * SPDX-License-Identifier: GPL-3.0-or-later
  * cdtext.c - CD-Text parsing from READ TOC format 5 data
  *
  * CD-Text is stored as 18-byte packs in the lead-in Q-subchannel.

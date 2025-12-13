@@ -1,5 +1,7 @@
 /*
  * mbdiscid - Disc ID calculator
+ * Copyright (C) 2025 Ian McNish
+ * SPDX-License-Identifier: GPL-3.0-or-later
  * discid.c - Disc ID calculations
  */
 
