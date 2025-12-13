@@ -331,11 +331,10 @@ void cli_print_help(void)
 /*
  * Print version information
  */
-void cli_print_version(void)
-{
-    printf("mbdiscid %s\n", MBDISCID_VERSION);
-    printf("%s\n", get_libdiscid_version());
-}
+ void cli_print_version(void)
+ {
+    printf("mbdiscid %s, %s\n", MBDISCID_VERSION, get_libdiscid_version());
+ }
 
 /*
  * Check if mode requires physical disc
