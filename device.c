@@ -241,8 +241,8 @@ int device_read_toc(const char *device, toc_t *toc, int verbosity)
 
     verbose(1, verbosity, "device: opening %s", dev_path);
 
-    /* Read TOC with MCN only - ISRC will be read via raw SCSI later */
-    int result = discid_read_sparse(disc, dev_path, DISCID_FEATURE_MCN);
+    /* Read basic TOC - MCN and ISRC will be read separately */
+    int result = discid_read_sparse(disc, dev_path, 0);
     if (!result) {
         const char *err = discid_get_error_msg(disc);
         error("cannot read disc: %s", err ? err : "unknown error");
