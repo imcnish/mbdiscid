@@ -509,7 +509,7 @@ int isrc_read_disc(toc_t *toc, const char *device, int verbosity)
 
     if (!batch_works) {
         /* Fall back to drive-based ISRC reading (less reliable) */
-        verbose(1, verbosity, "isrc: WARNING - using drive-based reading (no CRC validation)");
+        verbose(1, verbosity, "isrc: warning: using drive-based reading (no CRC validation)");
 
         for (int i = 0; i < toc->track_count; i++) {
             if (toc->tracks[i].type != TRACK_TYPE_AUDIO) {
@@ -552,7 +552,7 @@ int isrc_read_disc(toc_t *toc, const char *device, int verbosity)
                 if (read_track_isrc(dev, track, verbosity)) {
                     disc_has_isrc = true;
                     found_count++;
-                    verbose(1, verbosity, "isrc: probe hit on track %d", track->number);
+                    verbose(1, verbosity, "isrc: track %d: probe hit", track->number);
                 }
             }
 

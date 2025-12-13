@@ -358,7 +358,7 @@ static void parse_size_info(block_state_t *state, const uint8_t *raw_data,
 
         /* Validate CRC */
         if (!cdtext_pack_crc_valid(pack)) {
-            verbose(2, verbosity, "CD-Text: size info pack %zu CRC invalid, skipping", i);
+            verbose(2, verbosity, "cdtext: size info pack %zu CRC invalid, skipping", i);
             continue;
         }
 
@@ -375,7 +375,7 @@ static void parse_size_info(block_state_t *state, const uint8_t *raw_data,
             state->last_track = pack->text[2];
             state->size_info_found = true;
 
-            verbose(2, verbosity, "CD-Text: block 0 charset=%d tracks=%d-%d",
+            verbose(2, verbosity, "cdtext: block 0 charset=%d tracks=%d-%d",
                     state->charset, state->first_track, state->last_track);
         }
     }
@@ -390,18 +390,18 @@ int cdtext_parse(const uint8_t *raw_data, size_t len, cdtext_t *cdtext, int verb
     memset(cdtext, 0, sizeof(*cdtext));
 
     if (!raw_data || len == 0) {
-        verbose(2, verbosity, "CD-Text: no data");
+        verbose(2, verbosity, "cdtext: no data");
         return 0;
     }
 
     /* Calculate number of packs */
     size_t pack_count = len / CDTEXT_PACK_SIZE;
     if (pack_count == 0) {
-        verbose(2, verbosity, "CD-Text: data too short (%zu bytes)", len);
+        verbose(2, verbosity, "cdtext: data too short (%zu bytes)", len);
         return 0;
     }
 
-    verbose(1, verbosity, "CD-Text: parsing %zu packs (%zu bytes)", pack_count, len);
+    verbose(1, verbosity, "cdtext: parsing %zu packs (%zu bytes)", pack_count, len);
 
     /* Initialize block state */
     block_state_t state;
@@ -413,7 +413,7 @@ int cdtext_parse(const uint8_t *raw_data, size_t len, cdtext_t *cdtext, int verb
     /* Check encoding support */
     if (state.charset != CDTEXT_CHARSET_ISO8859_1 &&
         state.charset != CDTEXT_CHARSET_ASCII) {
-        verbose(1, verbosity, "CD-Text: unsupported charset %d (only ISO-8859-1/ASCII supported)",
+        verbose(1, verbosity, "cdtext: unsupported charset %d (only ISO-8859-1/ASCII supported)",
                 state.charset);
         block_state_free(&state);
         return 0;
@@ -441,7 +441,7 @@ int cdtext_parse(const uint8_t *raw_data, size_t len, cdtext_t *cdtext, int verb
         /* Validate CRC */
         if (!cdtext_pack_crc_valid(pack)) {
             invalid_packs++;
-            verbose(3, verbosity, "CD-Text: pack %zu type 0x%02X CRC invalid",
+            verbose(3, verbosity, "cdtext: pack %zu type 0x%02x CRC invalid",
                     i, pack->pack_type);
             continue;
         }
@@ -460,7 +460,7 @@ int cdtext_parse(const uint8_t *raw_data, size_t len, cdtext_t *cdtext, int verb
         process_text_pack(&state, pack, &current_track[type_idx], verbosity);
     }
 
-    verbose(1, verbosity, "CD-Text: %d valid packs, %d invalid", valid_packs, invalid_packs);
+    verbose(1, verbosity, "cdtext: %d valid packs, %d invalid", valid_packs, invalid_packs);
 
     /* Build output structure */
     cdtext->track_count = state.last_track;
