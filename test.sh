@@ -465,7 +465,7 @@ run_test_exit "--version exits 0" 0 "$MBDISCID" --version
 run_test_exit "-L exits 0" 0 "$MBDISCID" -L
 run_test_exit "no args fails" 64 "$MBDISCID"
 run_test_contains "-h shows Usage" "Usage:" "$MBDISCID" -h
-run_test_contains "-V shows version" "1.1.0" "$MBDISCID" -V
+run_test_contains "-V shows version" "2.0.0" "$MBDISCID" -V
 run_test_contains "no args shows usage" "Usage:" "$MBDISCID"
 
 # -----------------------------------------------------------------------------
