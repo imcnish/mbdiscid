@@ -28,15 +28,15 @@ mbdiscid is structured in layers:
 
 ```
 ┌─────────────────────────────────────────┐
-│              main.c                     │  CLI parsing, mode dispatch
+│               main.c                    │  CLI parsing, mode dispatch
 ├─────────────────────────────────────────┤
-│     discid.c    │    output.c          │  ID calculation, formatting
+│     discid.c     │    output.c          │  ID calculation, formatting
 ├─────────────────────────────────────────┤
-│      toc.c      │     isrc.c           │  TOC parsing, ISRC scanning
+│      toc.c       │     isrc.c           │  TOC parsing, ISRC scanning
 ├─────────────────────────────────────────┤
-│            device.c                     │  Device abstraction
+│              device.c                   │  Device abstraction
 ├──────────────────┬──────────────────────┤
-│  scsi_linux.c    │   scsi_macos.c      │  Platform SCSI layer
+│  scsi_linux.c    │    scsi_macos.c      │  Platform SCSI layer
 └──────────────────┴──────────────────────┘
 ```
 
@@ -302,13 +302,13 @@ We chose **3 × 192 = 576 frames** as a balance:
 
 ```
 Track: [====|=====|=====|=====|====]
-       ^                        ^
-       |<-- bookend      bookend -->|
+       ^                           ^
+       |<-- bookend     bookend -->|
 
        Usable area:
             [=====|=====|=====]
-                ^     ^     ^
-             T1    T2    T3
+               ^     ^     ^
+               T1    T2    T3
 ```
 
 Tranches are evenly spaced within the usable area (excluding bookends):
