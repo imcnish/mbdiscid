@@ -1,0 +1,253 @@
+.\" mbdiscid - Disc ID calculator
+.\" Copyright (C) 2025 Ian McNish
+.\" SPDX-License-Identifier: GPL-3.0-or-later
+.TH MBDISCID 1 "2025" "mbdiscid" "User Commands"
+.SH NAME
+mbdiscid \- calculate disc IDs and extract metadata from CDs
+.SH SYNOPSIS
+.B mbdiscid
+.RI [ options ]
+.I device
+.br
+.B mbdiscid
+.RI [ options ]
+.B \-c
+.I toc
+.br
+.B mbdiscid
+.B \-L
+.SH DESCRIPTION
+.B mbdiscid
+calculates disc identifiers (MusicBrainz, AccurateRip, FreeDB) from a
+physical CD or from TOC data provided on the command line or standard input.
+It can also extract CD metadata including CD-Text, ISRC codes, and the
+Media Catalog Number (MCN).
+.PP
+When reading from a physical disc, the default device is used if none is
+specified.
+When using
+.B \-c
+without arguments, TOC data is read from standard input.
+.SH OPTIONS
+.SS "Mode Options (mutually exclusive)"
+.TP
+.BR \-T ", " \-\-type
+Display media type classification (Audio CD, Enhanced CD, Mixed Mode CD, or Data CD).
+Requires a physical disc.
+.TP
+.BR \-X ", " \-\-text
+Display CD-Text metadata (album, artist, track titles).
+Requires a physical disc.
+.TP
+.BR \-C ", " \-\-catalog
+Display Media Catalog Number (MCN/barcode).
+Requires a physical disc.
+.TP
+.BR \-I ", " \-\-isrc
+Display ISRC codes for each audio track.
+Requires a physical disc.
+.TP
+.BR \-R ", " \-\-raw
+Display raw TOC in the format: first last offset1...offsetN leadout.
+Requires a physical disc.
+.TP
+.BR \-A ", " \-\-accuraterip
+Calculate and display AccurateRip disc ID and TOC.
+.TP
+.BR \-F ", " \-\-freedb
+Calculate and display FreeDB/CDDB disc ID and TOC.
+.TP
+.BR \-M ", " \-\-musicbrainz
+Calculate and display MusicBrainz disc ID and TOC.
+This is the default mode when using
+.BR \-c .
+.TP
+.BR \-a ", " \-\-all
+Display all available information.
+This is the default mode when reading from a physical disc.
+Requires a physical disc.
+.SS "Action Options (combinable)"
+These options control what information is displayed for the selected mode.
+If none are specified, the default depends on the mode.
+.TP
+.BR \-t ", " \-\-toc
+Display the TOC (Table of Contents) in the format appropriate for the selected mode.
+.TP
+.BR \-i ", " \-\-id
+Display only the disc ID.
+.TP
+.BR \-u ", " \-\-url
+Display the MusicBrainz lookup URL.
+Only valid with
+.B \-M
+or
+.BR \-a .
+.TP
+.BR \-o ", " \-\-open
+Open the MusicBrainz lookup URL in the default web browser.
+Only valid with
+.B \-M
+or
+.BR \-a .
+.SS "Modifier Options"
+.TP
+.BR \-c ", " \-\-calculate
+Calculate disc IDs from TOC data instead of reading from a physical disc.
+TOC data can be provided as arguments after the option or read from standard input.
+.TP
+.BR \-q ", " \-\-quiet
+Suppress error messages.
+The exit status still indicates success or failure.
+.TP
+.BR \-v ", " \-\-verbose
+Increase verbosity level.
+Can be specified multiple times for more detail.
+.TP
+.B \-\-assume\-audio
+When using
+.B \-Ac
+with raw TOC format, assume all tracks are audio.
+This allows AccurateRip ID calculation from raw TOC data for standard
+audio CDs.
+.B Warning:
+produces incorrect results for Enhanced CDs or Mixed Mode CDs.
+.SS "Standalone Options"
+.TP
+.BR \-L ", " \-\-list\-drives
+List available optical drives and exit.
+.TP
+.BR \-h ", " \-\-help
+Display help message and exit.
+.TP
+.BR \-V ", " \-\-version
+Display version information and exit.
+.SH "TOC FORMATS"
+When using
+.BR \-c ,
+the TOC format depends on the mode:
+.TP
+.B Raw format
+.I first last offset1...offsetN leadout
+.br
+All values are frame offsets including the 150-frame pregap.
+Auto-detected and accepted for
+.B \-Mc
+and
+.BR \-Fc .
+.TP
+.B MusicBrainz format (\-Mc)
+.I first last leadout offset1...offsetN
+.br
+Same values as raw format but with leadout in third position.
+.TP
+.B AccurateRip format (\-Ac)
+.I count audio first offset1...offsetN leadout
+.br
+Where
+.I count
+is total tracks,
+.I audio
+is number of audio tracks,
+.I first
+is the first audio track number, and offsets are raw LBA values (without pregap).
+.TP
+.B FreeDB format (\-Fc)
+.I count offset1...offsetN total_seconds
+.br
+Where
+.I count
+is track count, offsets include pregap, and
+.I total_seconds
+is disc length in seconds.
+.SH "EXIT STATUS"
+.TP
+.B 0
+Success.
+.TP
+.B 64
+Command line usage error (invalid options or arguments).
+.TP
+.B 65
+Data format error (invalid TOC data).
+.TP
+.B 69
+Service unavailable (feature not available in this build).
+.TP
+.B 70
+Internal software error.
+.TP
+.B 74
+I/O error (cannot read disc or device).
+.SH EXAMPLES
+Calculate MusicBrainz ID from a physical disc:
+.PP
+.RS
+.nf
+mbdiscid /dev/sr0
+mbdiscid -Mi /dev/sr0
+.fi
+.RE
+.PP
+Calculate AccurateRip ID from TOC data:
+.PP
+.RS
+.nf
+mbdiscid -Aic 17 17 1 0 19595 32425 42655 263705
+echo "17 17 1 0 19595 32425 42655 263705" | mbdiscid -Aic
+.fi
+.RE
+.PP
+Calculate MusicBrainz ID from raw TOC (auto-detected):
+.PP
+.RS
+.nf
+mbdiscid -Mic 1 17 150 19745 32575 42805 263855
+.fi
+.RE
+.PP
+Calculate AccurateRip ID from raw TOC (audio CD only):
+.PP
+.RS
+.nf
+mbdiscid -Ac --assume-audio 1 17 150 19745 32575 42805 263855
+.fi
+.RE
+.PP
+Read ISRC codes from disc:
+.PP
+.RS
+.nf
+mbdiscid -I /dev/sr0
+.fi
+.RE
+.PP
+Open MusicBrainz lookup in browser:
+.PP
+.RS
+.nf
+mbdiscid -o /dev/sr0
+.fi
+.RE
+.PP
+List optical drives:
+.PP
+.RS
+.nf
+mbdiscid -L
+.fi
+.RE
+.SH "SEE ALSO"
+.BR cd-discid (1),
+.BR cd-info (1)
+.PP
+MusicBrainz Disc ID: https://musicbrainz.org/doc/Disc_ID
+.br
+AccurateRip: http://accuraterip.com/
+.SH AUTHOR
+Ian McNish
+.SH COPYRIGHT
+Copyright \(co 2025 Ian McNish.
+License GPLv3+: GNU GPL version 3 or later.
+.br
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.

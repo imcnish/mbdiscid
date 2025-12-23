@@ -59,13 +59,17 @@ clean:
 # Install
 PREFIX ?= /usr/local
 BINDIR = $(PREFIX)/bin
+MANDIR = $(PREFIX)/share/man/man1
 
 install: $(TARGET)
 	install -d $(DESTDIR)$(BINDIR)
 	install -m 755 $(TARGET) $(DESTDIR)$(BINDIR)/
+	install -d $(DESTDIR)$(MANDIR)
+	install -m 644 $(TARGET).1 $(DESTDIR)$(MANDIR)/
 
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/$(TARGET)
+	rm -f $(DESTDIR)$(MANDIR)/$(TARGET).1
 
 # Test
 test: $(TARGET)
