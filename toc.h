@@ -16,10 +16,38 @@
 void toc_init(toc_t *toc);
 
 /*
+ * Detect TOC input format from string
+ *
+ * Analyzes the input string to determine which TOC format it represents.
+ * Returns a result struct containing the detected format and any error message.
+ *
+ * Detection is based on element count patterns:
+ *   - FreeDB:      vals[0] + 2 == count
+ *   - AccurateRip: vals[0] + 4 == count
+ *   - Raw/MB:      (vals[1] - vals[0] + 1) + 3 == count
+ *
+ * Raw vs MusicBrainz is disambiguated by leadout position:
+ *   - MusicBrainz: leadout at position 2
+ *   - Raw: leadout at end
+ */
+toc_detect_result_t toc_detect_format(const char *input);
+
+/*
+ * Get human-readable name for TOC format
+ */
+const char *toc_format_name(toc_format_t format);
+
+/*
  * Parse CDTOC input string according to format
  * Returns 0 on success, non-zero on error
  */
 int toc_parse(toc_t *toc, const char *input, toc_format_t format, int verbosity);
+
+/*
+ * Parse Raw format: first last offset1...offsetN leadout
+ * Assumes all tracks are audio (raw format has no track type info)
+ */
+int toc_parse_raw(toc_t *toc, const char *input, int verbosity);
 
 /*
  * Parse MusicBrainz format: first last leadout offset1...offsetN

@@ -247,7 +247,7 @@ int device_read_toc(const char *device, toc_t *toc, int verbosity)
     int result = discid_read_sparse(disc, dev_path, 0);
     if (!result) {
         const char *err = discid_get_error_msg(disc);
-        error("cannot read disc: %s", err ? err : "unknown error");
+        error("device: cannot read disc: %s", err ? err : "unknown error");
         discid_free(disc);
         free(dev_path);
         return EX_IOERR;

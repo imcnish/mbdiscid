@@ -36,6 +36,7 @@ static struct option long_opts[] = {
     /* Modifiers */
     {"calculate",   no_argument, NULL, 'c'},
     {"quiet",       no_argument, NULL, 'q'},
+    {"assume-audio", no_argument, NULL, 256},  /* Long-only option */
 
     /* Standalone */
     {"list-drives", no_argument, NULL, 'L'},
@@ -120,6 +121,9 @@ int cli_parse(int argc, char **argv, options_t *opts)
         case 'q':
             opts->quiet = true;
             break;
+        case 256:  /* --assume-audio */
+            opts->assume_audio = true;
+            break;
 
         /* Standalone */
         case 'L':
@@ -145,7 +149,7 @@ int cli_parse(int argc, char **argv, options_t *opts)
 
     /* Check for multiple modes */
     if (mode_count > 1) {
-        error_quiet(opts->quiet, "modes are mutually exclusive");
+        error_quiet(opts->quiet, "cli: modes are mutually exclusive");
         return EX_USAGE;
     }
 
@@ -169,7 +173,7 @@ int cli_parse(int argc, char **argv, options_t *opts)
 
             /* Check if it looks like a device path */
             if (cdtoc[0] == '/') {
-                error_quiet(opts->quiet, "-c expects TOC data, not a device path");
+                error_quiet(opts->quiet, "cli: -c requires TOC data");
                 free(cdtoc);
                 return EX_USAGE;
             }
@@ -178,7 +182,7 @@ int cli_parse(int argc, char **argv, options_t *opts)
         } else {
             /* Single device argument */
             if (argc - optind > 1) {
-                error_quiet(opts->quiet, "too many arguments");
+                error_quiet(opts->quiet, "cli: too many arguments");
                 return EX_USAGE;
             }
             opts->device = argv[optind];
@@ -203,6 +207,14 @@ int cli_validate(const options_t *opts)
         return EX_USAGE;
     }
 
+    /* --assume-audio only valid with -Ac */
+    if (opts->assume_audio) {
+        if (opts->mode != MODE_ACCURATERIP || !opts->calculate) {
+            error_quiet(opts->quiet, "cli: --assume-audio requires -Ac");
+            return EX_USAGE;
+        }
+    }
+
     /* -c with disc-required modes */
     if (opts->calculate) {
         if (opts->mode == MODE_TYPE || opts->mode == MODE_TEXT ||
@@ -210,13 +222,13 @@ int cli_validate(const options_t *opts)
             opts->mode == MODE_RAW || opts->mode == MODE_ALL) {
 
             if (opts->mode == MODE_RAW || opts->mode == MODE_ALL) {
-                error_quiet(opts->quiet, "-c is mutually exclusive with -%c",
-                           opts->mode == MODE_RAW ? 'R' : 'a');
+                error_quiet(opts->quiet, "cli: -c and %s are mutually exclusive",
+                           opts->mode == MODE_RAW ? "-R" : "-a");
             } else {
-                error_quiet(opts->quiet, "-%c modes require a physical disc",
-                           opts->mode == MODE_TYPE ? 'T' :
-                           opts->mode == MODE_TEXT ? 'X' :
-                           opts->mode == MODE_MCN ? 'C' : 'I');
+                error_quiet(opts->quiet, "cli: %s requires a disc",
+                           opts->mode == MODE_TYPE ? "-T" :
+                           opts->mode == MODE_TEXT ? "-X" :
+                           opts->mode == MODE_MCN ? "-C" : "-I");
             }
             return EX_USAGE;
         }
@@ -229,7 +241,7 @@ int cli_validate(const options_t *opts)
             effective_mode = MODE_MUSICBRAINZ;  /* Default */
 
         if (effective_mode != MODE_MUSICBRAINZ && effective_mode != MODE_ALL) {
-            error_quiet(opts->quiet, "-u/-o not supported for this mode");
+            error_quiet(opts->quiet, "cli: -u/-o not supported for this mode");
             return EX_USAGE;
         }
     }
@@ -318,6 +330,7 @@ void cli_print_help(void)
     printf("  -c, --calculate     Calculate from TOC data instead of disc\n");
     printf("  -q, --quiet         Suppress error messages\n");
     printf("  -v, --verbose       Increase verbosity (repeat for more)\n");
+    printf("      --assume-audio  Allow raw TOC input for AccurateRip (assumes CD-DA)\n");
     printf("\n");
     printf("Standalone options:\n");
     printf("  -L, --list-drives   List available optical drives\n");
@@ -325,9 +338,14 @@ void cli_print_help(void)
     printf("  -V, --version       Display version information\n");
     printf("\n");
     printf("TOC formats for -c:\n");
-    printf("  -Mc: first last leadout offset1...offsetN\n");
-    printf("  -Ac: count audio first offset1...offsetN leadout\n");
-    printf("  -Fc: count offset1...offsetN total_seconds\n");
+    printf("  Raw:  first last offset1...offsetN leadout\n");
+    printf("  -Mc:  first last leadout offset1...offsetN\n");
+    printf("  -Ac:  count audio first offset1...offsetN leadout\n");
+    printf("  -Fc:  count offset1...offsetN total_seconds\n");
+    printf("\n");
+    printf("Raw TOC format is auto-detected and accepted for -Mc and -Fc.\n");
+    printf("AccurateRip (-Ac) requires AccurateRip format, or use --assume-audio\n");
+    printf("with raw format for standard CD-DA discs.\n");
 }
 
 /*

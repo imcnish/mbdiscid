@@ -62,7 +62,7 @@ void *xmalloc(size_t size)
 {
     void *ptr = malloc(size);
     if (!ptr && size > 0) {
-        error("out of memory");
+        error("cannot allocate memory");
         exit(EX_SOFTWARE);
     }
     return ptr;
@@ -75,7 +75,7 @@ void *xcalloc(size_t nmemb, size_t size)
 {
     void *ptr = calloc(nmemb, size);
     if (!ptr && nmemb > 0 && size > 0) {
-        error("out of memory");
+        error("cannot allocate memory");
         exit(EX_SOFTWARE);
     }
     return ptr;
@@ -88,7 +88,7 @@ void *xrealloc(void *ptr, size_t size)
 {
     void *new_ptr = realloc(ptr, size);
     if (!new_ptr && size > 0) {
-        error("out of memory");
+        error("cannot allocate memory");
         exit(EX_SOFTWARE);
     }
     return new_ptr;
@@ -103,7 +103,7 @@ char *xstrdup(const char *s)
         return NULL;
     char *dup = strdup(s);
     if (!dup) {
-        error("out of memory");
+        error("cannot allocate memory");
         exit(EX_SOFTWARE);
     }
     return dup;

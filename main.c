@@ -60,7 +60,7 @@ static int calculate_ids(disc_info_t *disc, int mode, bool quiet)
         disc->ids.musicbrainz[MB_ID_LENGTH] = '\0';
         free(id);
     } else if (need_mb) {
-        error_quiet(quiet, "failed to calculate MusicBrainz disc ID");
+        error_quiet(quiet, "discid: cannot calculate MusicBrainz ID");
         return EX_SOFTWARE;
     }
 
@@ -71,7 +71,7 @@ static int calculate_ids(disc_info_t *disc, int mode, bool quiet)
         disc->ids.freedb[FREEDB_ID_LENGTH] = '\0';
         free(id);
     } else if (need_freedb) {
-        error_quiet(quiet, "failed to calculate FreeDB disc ID");
+        error_quiet(quiet, "discid: cannot calculate FreeDB ID");
         return EX_SOFTWARE;
     }
 
@@ -82,7 +82,7 @@ static int calculate_ids(disc_info_t *disc, int mode, bool quiet)
         disc->ids.accuraterip[AR_ID_LENGTH] = '\0';
         free(id);
     } else if (need_ar) {
-        error_quiet(quiet, "failed to calculate AccurateRip disc ID");
+        error_quiet(quiet, "discid: cannot calculate AccurateRip ID");
         return EX_SOFTWARE;
     }
 
@@ -136,15 +136,41 @@ int main(int argc, char **argv)
             /* Read from stdin */
             stdin_toc = read_stdin_toc();
             if (!stdin_toc || !stdin_toc[0]) {
-                error_quiet(opts.quiet, "no TOC data provided");
+                error_quiet(opts.quiet, "cli: -c requires TOC data");
                 free(stdin_toc);
                 return EX_DATAERR;
             }
             toc_str = stdin_toc;
         }
 
-        toc_format_t format = cli_get_toc_format(opts.mode);
-        ret = toc_parse(&disc.toc, toc_str, format, opts.verbosity);
+        /* Detect TOC format */
+        toc_detect_result_t detected = toc_detect_format(toc_str);
+
+        if (detected.format == TOC_FORMAT_INVALID) {
+            error_quiet(opts.quiet, "%s", detected.error);
+            free(stdin_toc);
+            return EX_DATAERR;
+        }
+
+        if (detected.format == TOC_FORMAT_INDETERMINATE) {
+            error_quiet(opts.quiet, "%s", detected.error);
+            free(stdin_toc);
+            return EX_DATAERR;
+        }
+
+        verbose(1, opts.verbosity, "toc: detected format: %s", toc_format_name(detected.format));
+
+        /* Check if format is acceptable for mode */
+        if (opts.mode == MODE_ACCURATERIP && detected.format == TOC_FORMAT_RAW) {
+            if (!opts.assume_audio) {
+                error_quiet(opts.quiet, "accuraterip: raw TOC not supported");
+                free(stdin_toc);
+                return EX_USAGE;
+            }
+            verbose(1, opts.verbosity, "toc: assuming all tracks are audio (--assume-audio)");
+        }
+
+        ret = toc_parse(&disc.toc, toc_str, detected.format, opts.verbosity);
         free(stdin_toc);
 
         if (ret != 0) {

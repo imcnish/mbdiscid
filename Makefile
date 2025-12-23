@@ -29,7 +29,7 @@ ifdef DEBUG
 endif
 
 # Version
-MBDISCID_VERSION ?= 2.0.0
+MBDISCID_VERSION ?= 2.0.0a
 CFLAGS += -DMBDISCID_VERSION=\"$(MBDISCID_VERSION)\"
 
 # Source and header files

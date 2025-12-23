@@ -54,11 +54,301 @@ static int parse_integers(const char *input, int32_t *vals, int max_vals)
 }
 
 /*
+ * Get human-readable name for TOC format
+ */
+const char *toc_format_name(toc_format_t format)
+{
+    switch (format) {
+    case TOC_FORMAT_RAW:
+        return "raw";
+    case TOC_FORMAT_MUSICBRAINZ:
+        return "MusicBrainz";
+    case TOC_FORMAT_ACCURATERIP:
+        return "AccurateRip";
+    case TOC_FORMAT_FREEDB:
+        return "FreeDB";
+    case TOC_FORMAT_INVALID:
+        return "invalid";
+    case TOC_FORMAT_INDETERMINATE:
+        return "indeterminate";
+    default:
+        return "unknown";
+    }
+}
+
+/*
+ * Detect TOC input format from string
+ *
+ * Detection algorithm:
+ * 1. Parse input into integer array
+ * 2. Test element count formulas to identify format family
+ * 3. Apply format-specific sanity checks
+ * 4. For Raw/MB: disambiguate by leadout position
+ */
+toc_detect_result_t toc_detect_format(const char *input)
+{
+    toc_detect_result_t result = { TOC_FORMAT_INVALID, NULL };
+    int32_t vals[MAX_TRACKS + 10];
+    int count;
+
+    /* Parse input */
+    count = parse_integers(input, vals, MAX_TRACKS + 10);
+
+    if (count < 0) {
+        result.error = "toc: non-numeric value";
+        return result;
+    }
+
+    if (count < 3) {
+        result.error = "toc: too few values";
+        return result;
+    }
+
+    /* Check all values are non-negative and within CD capacity */
+    for (int i = 0; i < count; i++) {
+        if (vals[i] < 0) {
+            result.error = "toc: value cannot be negative";
+            return result;
+        }
+        if (vals[i] > MAX_CD_FRAMES) {
+            result.error = "toc: value exceeds CD capacity";
+            return result;
+        }
+    }
+
+    /* Test element count formulas */
+    bool fd_match = (vals[0] + 2 == count);
+    bool ar_match = (vals[0] + 4 == count);
+    bool raw_mb_match = false;
+
+    /* Raw/MB: (last - first + 1) + 3 == count, where first=vals[0], last=vals[1] */
+    if (count >= 4 && vals[1] >= vals[0] && vals[1] <= 99 && vals[0] >= 1) {
+        int expected_tracks = vals[1] - vals[0] + 1;
+        raw_mb_match = (expected_tracks + 3 == count);
+    }
+
+    /* Count how many format families match */
+    int matches = (fd_match ? 1 : 0) + (ar_match ? 1 : 0) + (raw_mb_match ? 1 : 0);
+
+    if (matches == 0) {
+        result.error = "toc: format not recognized";
+        return result;
+    }
+
+    /* If multiple matches, try to disambiguate */
+    if (matches > 1) {
+        /*
+         * AR vs Raw/MB disambiguation:
+         * AR format has strict constraints on first three values.
+         * If AR matches mathematically but fails sanity, eliminate it.
+         */
+        if (ar_match && raw_mb_match) {
+            int total = vals[0];
+            int audio_count = vals[1];
+            int first_audio = vals[2];
+
+            /* AR sanity: audio_count <= total, first_audio <= total */
+            if (audio_count > total || first_audio > total ||
+                total < 1 || total > 99 || audio_count < 0 || first_audio < 1) {
+                ar_match = false;
+            }
+        }
+
+        /*
+         * FreeDB vs Raw/MB disambiguation:
+         * - FreeDB last value is total_seconds (typically < 6000)
+         * - Raw/MB last value (or vals[2] for MB) is leadout in frames (typically > 10000)
+         *
+         * Also, for FreeDB: total_seconds ≈ (last_offset + track_length) / 75
+         * The total_seconds should be within a reasonable range of the leadout.
+         */
+        if (fd_match && raw_mb_match) {
+            int32_t last_val = vals[count - 1];
+            int32_t second_last = vals[count - 2];
+
+            /*
+             * If last value is plausible as seconds (< 6000 = 100 minutes)
+             * AND last value is approximately second_last / 75
+             * then it's likely FreeDB
+             */
+            if (last_val < 6000 && last_val > 0) {
+                int32_t expected_seconds = second_last / FRAMES_PER_SECOND;
+                int32_t diff = last_val - expected_seconds;
+                if (diff >= -2 && diff <= 100) {
+                    /* Looks like FreeDB */
+                    fd_match = true;
+                    raw_mb_match = false;
+                } else {
+                    /* Large discrepancy - probably Raw/MB with small values */
+                    fd_match = false;
+                }
+            } else {
+                /* Last value too large for seconds, must be Raw/MB */
+                fd_match = false;
+            }
+        }
+
+        /* AR has a unique element count pattern, shouldn't overlap with others */
+        /* If still ambiguous after above checks, return indeterminate */
+        matches = (fd_match ? 1 : 0) + (ar_match ? 1 : 0) + (raw_mb_match ? 1 : 0);
+        if (matches > 1) {
+            result.format = TOC_FORMAT_INDETERMINATE;
+            result.error = "toc: format is ambiguous";
+            return result;
+        }
+    }
+
+    /* Now exactly one format family matched - apply sanity checks */
+
+    if (fd_match) {
+        /* FreeDB format: count offset1...offsetN total_seconds */
+        int track_count = vals[0];
+        int32_t total_seconds = vals[count - 1];
+
+        if (track_count < 1 || track_count > 99) {
+            result.error = "toc: track count out of range";
+            return result;
+        }
+
+        if (total_seconds <= 0) {
+            result.error = "toc: total seconds out of range";
+            return result;
+        }
+
+        /* Check offsets are ascending */
+        for (int i = 2; i < count - 1; i++) {
+            if (vals[i] <= vals[i - 1]) {
+                result.error = "toc: offsets not in ascending order";
+                return result;
+            }
+        }
+
+        result.format = TOC_FORMAT_FREEDB;
+        result.error = NULL;
+        return result;
+    }
+
+    if (ar_match) {
+        /* AccurateRip format: total audio first offset1...offsetN leadout */
+        int total = vals[0];
+        int audio_count = vals[1];
+        int first_audio = vals[2];
+        int32_t leadout = vals[count - 1];
+
+        if (total < 1 || total > 99) {
+            result.error = "toc: track count out of range";
+            return result;
+        }
+
+        if (audio_count < 0 || audio_count > total) {
+            result.error = "toc: audio count out of range";
+            return result;
+        }
+
+        if (first_audio < 1 || first_audio > total) {
+            result.error = "toc: first audio track out of range";
+            return result;
+        }
+
+        /* Check offsets are ascending */
+        for (int i = 4; i < count - 1; i++) {
+            if (vals[i] <= vals[i - 1]) {
+                result.error = "toc: offsets not in ascending order";
+                return result;
+            }
+        }
+
+        /* Check leadout > last offset */
+        if (leadout <= vals[count - 2]) {
+            result.error = "toc: leadout before last track";
+            return result;
+        }
+
+        result.format = TOC_FORMAT_ACCURATERIP;
+        result.error = NULL;
+        return result;
+    }
+
+    if (raw_mb_match) {
+        /* Raw or MusicBrainz format - disambiguate by leadout position */
+        int first = vals[0];
+        int last = vals[1];
+        int32_t pos2_val = vals[2];
+        int32_t last_val = vals[count - 1];
+
+        if (first < 1 || first > 99) {
+            result.error = "toc: first track out of range";
+            return result;
+        }
+
+        if (last < first || last > 99) {
+            result.error = "toc: last track out of range";
+            return result;
+        }
+
+        /*
+         * Disambiguate Raw vs MusicBrainz by leadout position:
+         * - MusicBrainz: first last leadout offset1...offsetN
+         *   leadout at position 2, should be larger than all offsets
+         * - Raw: first last offset1...offsetN leadout
+         *   leadout at end, should be larger than all offsets
+         */
+        if (pos2_val > last_val) {
+            /* Position 2 is larger - MusicBrainz format (leadout at pos 2) */
+
+            /* Check offsets (positions 3 to count-1) are ascending */
+            for (int i = 4; i < count; i++) {
+                if (vals[i] <= vals[i - 1]) {
+                    result.error = "toc: offsets not in ascending order";
+                    return result;
+                }
+            }
+
+            /* Check leadout > last offset */
+            if (pos2_val <= vals[count - 1]) {
+                result.error = "toc: leadout before last track";
+                return result;
+            }
+
+            result.format = TOC_FORMAT_MUSICBRAINZ;
+            result.error = NULL;
+            return result;
+        } else {
+            /* Last position is larger - Raw format (leadout at end) */
+
+            /* Check offsets (positions 2 to count-2) are ascending */
+            for (int i = 3; i < count - 1; i++) {
+                if (vals[i] <= vals[i - 1]) {
+                    result.error = "toc: offsets not in ascending order";
+                    return result;
+                }
+            }
+
+            /* Check leadout > last offset */
+            if (last_val <= vals[count - 2]) {
+                result.error = "toc: leadout before last track";
+                return result;
+            }
+
+            result.format = TOC_FORMAT_RAW;
+            result.error = NULL;
+            return result;
+        }
+    }
+
+    /* Should not reach here */
+    result.error = "toc: internal error";
+    return result;
+}
+
+/*
  * Parse CDTOC input according to specified format
  */
 int toc_parse(toc_t *toc, const char *input, toc_format_t format, int verbosity)
 {
     switch (format) {
+    case TOC_FORMAT_RAW:
+        return toc_parse_raw(toc, input, verbosity);
     case TOC_FORMAT_MUSICBRAINZ:
         return toc_parse_musicbrainz(toc, input, verbosity);
     case TOC_FORMAT_ACCURATERIP:
@@ -66,8 +356,99 @@ int toc_parse(toc_t *toc, const char *input, toc_format_t format, int verbosity)
     case TOC_FORMAT_FREEDB:
         return toc_parse_freedb(toc, input, verbosity);
     default:
-        return -1;
+        return EX_DATAERR;
     }
+}
+
+/*
+ * Parse Raw format: first last offset1...offsetN leadout
+ * All values are frame counts (LBA + 150 pregap)
+ * Assumes all tracks are audio (raw format has no track type info)
+ */
+int toc_parse_raw(toc_t *toc, const char *input, int verbosity)
+{
+    int32_t vals[MAX_TRACKS + 4];
+    int count = parse_integers(input, vals, MAX_TRACKS + 4);
+
+    if (count < 0)
+        return EX_DATAERR;  /* Non-numeric input */
+
+    if (count < 4) {
+        /* Need at least: first last offset1 leadout */
+        return EX_DATAERR;
+    }
+
+    int first = vals[0];
+    int last = vals[1];
+    int expected_offsets = last - first + 1;
+
+    /* Validate track numbers */
+    if (first < 1 || first > 99) {
+        return EX_DATAERR;
+    }
+    if (last < first || last > 99) {
+        return EX_DATAERR;
+    }
+
+    /* Check we have right number of values: first last offset1...offsetN leadout */
+    if (count != 2 + expected_offsets + 1) {
+        return EX_DATAERR;
+    }
+
+    /* Check for negative values */
+    for (int i = 0; i < count; i++) {
+        if (vals[i] < 0)
+            return EX_DATAERR;
+    }
+
+    int32_t leadout = vals[count - 1];
+
+    toc_init(toc);
+    toc->first_track = first;
+    toc->last_track = last;
+    toc->track_count = expected_offsets;
+    toc->leadout = leadout - PREGAP_FRAMES;  /* Convert to raw LBA */
+
+    /* Parse track offsets - convert from frame format (with pregap) to raw LBA */
+    for (int i = 0; i < expected_offsets; i++) {
+        int track_num = first + i;
+        int32_t offset = vals[2 + i] - PREGAP_FRAMES;  /* Convert to raw LBA */
+
+        /* Check monotonically increasing */
+        if (i > 0 && offset <= toc->tracks[i - 1].offset) {
+            return EX_DATAERR;
+        }
+
+        toc->tracks[i].number = track_num;
+        toc->tracks[i].session = 1;
+        toc->tracks[i].offset = offset;
+        toc->tracks[i].type = TRACK_TYPE_AUDIO;  /* Assume audio for raw format */
+    }
+
+    /* Leadout must be after last track */
+    if (toc->leadout <= toc->tracks[expected_offsets - 1].offset) {
+        return EX_DATAERR;
+    }
+
+    /* Calculate track lengths */
+    for (int i = 0; i < expected_offsets - 1; i++) {
+        toc->tracks[i].length = toc->tracks[i + 1].offset - toc->tracks[i].offset;
+    }
+    toc->tracks[expected_offsets - 1].length = toc->leadout - toc->tracks[expected_offsets - 1].offset;
+
+    toc->audio_count = expected_offsets;
+    toc->audio_leadout = toc->leadout;
+
+    /* Verbose output */
+    verbose(2, verbosity, "toc: user reports tracks %d-%d, leadout %d",
+            first, last, toc->leadout);
+    verbose(1, verbosity, "toc: %d tracks", toc->track_count);
+    for (int i = 0; i < toc->track_count; i++) {
+        verbose(2, verbosity, "toc: track %d: offset %d, length %d",
+                toc->tracks[i].number, toc->tracks[i].offset, toc->tracks[i].length);
+    }
+
+    return 0;
 }
 
 /*

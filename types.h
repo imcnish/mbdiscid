@@ -143,15 +143,34 @@ typedef struct {
     bool list_drives;       /* -L */
     bool help;              /* -h */
     bool version;           /* -V */
+    bool assume_audio;      /* --assume-audio: allow raw TOC in AR mode */
     const char *device;     /* Device path or NULL */
     const char *cdtoc;      /* CDTOC string or NULL (stdin if -c alone) */
 } options_t;
 
 /* TOC input format (for -c) */
 typedef enum {
-    TOC_FORMAT_MUSICBRAINZ, /* first last leadout offset1...offsetN */
-    TOC_FORMAT_ACCURATERIP, /* count audio first offset1...offsetN leadout */
-    TOC_FORMAT_FREEDB       /* count offset1...offsetN total_seconds */
+    TOC_FORMAT_MUSICBRAINZ,  /* first last leadout offset1...offsetN */
+    TOC_FORMAT_ACCURATERIP,  /* count audio first offset1...offsetN leadout */
+    TOC_FORMAT_FREEDB,       /* count offset1...offsetN total_seconds */
+    TOC_FORMAT_RAW,          /* first last offset1...offsetN leadout */
+    TOC_FORMAT_INVALID,      /* Malformed, fails sanity checks */
+    TOC_FORMAT_INDETERMINATE /* Well-formed but cannot identify format */
 } toc_format_t;
+
+/*
+ * TOC format detection result
+ *
+ * Maximum CD capacity in frames:
+ *   Standard CD (Red Book): 74 min = 74 * 60 * 75 = 333,000 frames
+ *   Extended capacity:      80 min = 80 * 60 * 75 = 360,000 frames
+ *   Overburned discs:       99 min = 99 * 60 * 75 = 445,500 frames
+ */
+#define MAX_CD_FRAMES 445500
+
+typedef struct {
+    toc_format_t format;    /* Detected format or error state */
+    const char *error;      /* Error message if invalid/indeterminate, NULL otherwise */
+} toc_detect_result_t;
 
 #endif /* MBDISCID_TYPES_H */

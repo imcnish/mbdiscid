@@ -55,6 +55,7 @@ declare -A SUBLIME=(
     [mb_toc]="1 17 263855 150 19745 32575 42805 54545 72047 85787 95555 117545 145010 150657 160517 178172 193610 215417 231297 244930"
     [ar_toc]="17 17 1 0 19595 32425 42655 54395 71897 85637 95405 117395 144860 150507 160367 178022 193460 215267 231147 244780 263705"
     [fb_toc]="17 150 19745 32575 42805 54545 72047 85787 95555 117545 145010 150657 160517 178172 193610 215417 231297 244930 3518"
+    [raw_toc]="1 17 150 19745 32575 42805 54545 72047 85787 95555 117545 145010 150657 160517 178172 193610 215417 231297 244930 263855"
     [ar_id]="017-00231e4f-01bf54d7-e00dbc11"
     [fb_id]="e00dbc11"
     [mb_id]="m.wjLfLe7XrMz1c_iAL6qo06Q4w-"
@@ -87,6 +88,7 @@ declare -A GGD=(
     [mb_toc]="1 13 203420 182 12262 28217 46107 58452 77167 97980 112652 130482 143362 152105 173820 183620"
     [ar_toc]="13 13 1 32 12112 28067 45957 58302 77017 97830 112502 130332 143212 151955 173670 183470 203270"
     [fb_toc]="13 182 12262 28217 46107 58452 77167 97980 112652 130482 143362 152105 173820 183670 2712"
+    [raw_toc]="1 13 182 12262 28217 46107 58452 77167 97980 112652 130482 143362 152105 173820 183620 203420"
     [ar_id]="013-0015a200-00d903ba-a60a960d"
     [fb_id]="a60a960d"
     [mb_id]="eafSQC0kDG0EPmE15c7vmMp6PNs-"
@@ -115,6 +117,7 @@ declare -A CRANBERRIES=(
     [mb_toc]="1 13 214052 150 15980 28357 52925 69090 85687 102352 119185 133290 146322 160770 176690 198225"
     [ar_toc]="13 13 1 0 15830 28207 52775 68940 85537 102202 119035 133140 146172 160620 176540 198075 213902"
     [fb_toc]="13 150 15980 28357 52925 69090 85687 102352 119185 133290 146322 160770 176690 198225 2854"
+    [raw_toc]="1 13 150 15980 28357 52925 69090 85687 102352 119185 133290 146322 160770 176690 198225 214052"
     [ar_id]="013-0016e72f-00e46449-ac0b240d"
     [fb_id]="ac0b240d"
     [mb_id]="ED06vnWi7Emm8fFP1Cm7R0hBHvc-"
@@ -143,6 +146,7 @@ declare -A MB20=(
     [mb_toc]="1 12 210860 182 17567 34492 51517 69417 86292 111805 126812 140137 158400 177687 193810"
     [ar_toc]="12 12 1 32 17417 34342 51367 69267 86142 111655 126662 139987 158250 177537 193660 210710"
     [fb_toc]="12 182 17567 34492 51517 69417 86292 111805 126812 140137 158400 177687 193810 2811"
+    [raw_toc]="1 12 182 17567 34492 51517 69417 86292 111805 126812 140137 158400 177687 193810 210860"
     [ar_id]="012-00150304-00c439dc-aa0af90c"
     [fb_id]="aa0af90c"
     [mb_id]="eu.FPhvxgQ78cpBNSeKdyXTp85s-"
@@ -159,6 +163,7 @@ declare -A RUSH=(
     [mb_toc]="1 13 346060 150 23602 54277 89160 106172 120292 131985 171500 178762 200477 255250 280202 302760"
     [ar_toc]="13 13 1 0 23452 54127 89010 106022 120142 131835 171350 178612 200327 255100 280052 302610 345910"
     [fb_toc]="13 150 23602 54277 89160 106172 120292 131985 171500 178762 200477 255250 280202 302760 4614"
+    [raw_toc]="1 13 150 23602 54277 89160 106172 120292 131985 171500 178762 200477 255250 280202 302760 346060"
     [ar_id]="013-00227675-0159d3a9-b112040d"
     [fb_id]="b112040d"
     [mb_id]="4PtT2zz5BmntI7XfmT2dTpEsZ0E-"
@@ -187,6 +192,7 @@ declare -A DADA=(
     [mb_toc]="1 12 247562 150 27602 48552 67590 86080 102480 123680 142122 160132 179750 195157 223667"
     [ar_toc]="12 12 1 0 27452 48402 67440 85930 102330 123530 141972 159982 179600 195007 223517 247412"
     [fb_toc]="12 150 27602 48552 67590 86080 102480 123680 142122 160132 179750 195157 223667 3300"
+    [raw_toc]="1 12 150 27602 48552 67590 86080 102480 123680 142122 160132 179750 195157 223667 247562"
     [ar_id]="012-0018740e-00e1baf6-b30ce20c"
     [fb_id]="b30ce20c"
     [mb_id]="EbaBnJokyGEpgZ_1CN_RAhcLqRw-"
@@ -208,6 +214,7 @@ declare -A METALLICA=(
     [mb_toc]="1 11 338102 150 26427 59512 97427 121795 160052 185967 218225 242760 274965 298510"
     [ar_toc]="12 11 1 0 26277 59362 97277 121645 159902 185817 218075 242610 274815 298360 349352 357656"
     [fb_toc]="12 150 26427 59512 97427 121795 160052 185967 218225 242760 274965 298510 349502 4770"
+    [raw_toc]="1 12 150 26427 59512 97427 121795 160052 185967 218225 242760 274965 298510 349502 357806"
     [ar_id]="011-001f27c4-010ea9c1-bb12a00c"
     [fb_id]="bb12a00c"
     [mb_id]="eoknU.IyXXaywKSXdaNZgbqkGZw-"
@@ -235,6 +242,7 @@ declare -A BLUEOCT=(
     [mb_toc]="1 14 310305 150 7534 33634 51696 71318 95909 116841 136693 158748 181104 200303 222900 247371 280976"
     [ar_toc]="15 14 1 0 7384 33484 51546 71168 95759 116691 136543 158598 180954 200153 222750 247221 280826 321555 332528"
     [fb_toc]="15 150 7534 33634 51696 71318 95909 116841 136693 158748 181104 200303 222900 247371 280976 321705 4435"
+    [raw_toc]="1 14 150 7534 33634 51696 71318 95909 116841 136693 158748 181104 200303 222900 247371 280976 321705"
     [ar_id]="014-00209635-01652576-e211510f"
     [fb_id]="e211510f"
     [mb_id]="hO3GT18x_9qBZL3vZhhpDexHnv8-"
@@ -269,6 +277,7 @@ declare -A FREEDOM=(
     [mb_toc]="1 9 320528 150 148734 169482 184797 202605 217733 248258 259988 278078"
     [ar_toc]="9 8 2 0 148584 169332 184647 202455 217583 248108 259838 277928 320378"
     [fb_toc]="9 150 148734 169482 184797 202605 217733 248258 259988 278078 4273"
+    [raw_toc]="1 9 150 148734 169482 184797 202605 217733 248258 259988 278078 320528"
     [ar_id]="008-001ef535-00ad3cb0-7b10af09"
     [fb_id]="7b10af09"
     [mb_id]="xYH60C0oTAOYn7y3CWYvrD7RMH4-"
@@ -434,6 +443,29 @@ test_mb_id() {
     fi
 }
 
+# Test AccurateRip ID from raw TOC with --assume-audio
+test_raw_ar_id() {
+    local -n disc=$1
+    local actual
+
+    ((TESTS_RUN++))
+    echo -n "  ${disc[name]}: Raw TOC + --assume-audio ... "
+
+    # Skip if no raw_toc defined
+    if [[ -z "${disc[raw_toc]:-}" ]]; then
+        echo -e "${YELLOW}SKIP${NC} (no raw_toc)"
+        return
+    fi
+
+    actual=$(echo "${disc[raw_toc]}" | "$MBDISCID" -Aic --assume-audio 2>&1) || true
+
+    if [[ "$actual" == "${disc[ar_id]}" ]]; then
+        test_pass
+    else
+        test_fail "${disc[ar_id]}" "$actual"
+    fi
+}
+
 # =============================================================================
 # TEST CATEGORIES
 # =============================================================================
@@ -465,7 +497,7 @@ run_test_exit "--version exits 0" 0 "$MBDISCID" --version
 run_test_exit "-L exits 0" 0 "$MBDISCID" -L
 run_test_exit "no args fails" 64 "$MBDISCID"
 run_test_contains "-h shows Usage" "Usage:" "$MBDISCID" -h
-run_test_contains "-V shows version" "2.0.0" "$MBDISCID" -V
+run_test_match "-V shows version" 'mbdiscid [0-9]+\.[0-9]+' "$MBDISCID" -V
 run_test_contains "no args shows usage" "Usage:" "$MBDISCID"
 
 # -----------------------------------------------------------------------------
@@ -515,6 +547,21 @@ test_mb_id FREEDOM
 
 # -----------------------------------------------------------------------------
 echo ""
+echo -e "${YELLOW}=== Raw TOC + --assume-audio Verification ===${NC}"
+# -----------------------------------------------------------------------------
+
+# These tests verify that raw TOC input with --assume-audio produces correct AR IDs
+# by comparing against known-good AR IDs from the native AR TOC format
+
+test_raw_ar_id SUBLIME
+test_raw_ar_id GGD
+test_raw_ar_id CRANBERRIES
+test_raw_ar_id MB20
+test_raw_ar_id RUSH
+test_raw_ar_id DADA
+
+# -----------------------------------------------------------------------------
+echo ""
 echo -e "${YELLOW}=== Mode Mutual Exclusivity ===${NC}"
 # -----------------------------------------------------------------------------
 
@@ -529,14 +576,53 @@ echo ""
 echo -e "${YELLOW}=== Invalid Option Combinations ===${NC}"
 # -----------------------------------------------------------------------------
 
-run_test_exit_contains "-Cc requires disc" 64 "require a physical disc" "$MBDISCID" -Cc
-run_test_exit_contains "-Ic requires disc" 64 "require a physical disc" "$MBDISCID" -Ic
-run_test_exit_contains "-Tc requires disc" 64 "require a physical disc" "$MBDISCID" -Tc
+run_test_exit_contains "-Cc requires disc" 64 "cli: -C requires a disc" "$MBDISCID" -Cc
+run_test_exit_contains "-Ic requires disc" 64 "cli: -I requires a disc" "$MBDISCID" -Ic
+run_test_exit_contains "-Tc requires disc" 64 "cli: -T requires a disc" "$MBDISCID" -Tc
 run_test_exit_contains "-Rc invalid" 64 "mutually exclusive" "$MBDISCID" -Rc 1 2 3000 150 1000
 run_test_exit_contains "-ac invalid" 64 "mutually exclusive" "$MBDISCID" -ac 1 2 3000 150 1000
 run_test_exit_contains "-Au invalid" 64 "not supported" "$MBDISCID" -Auc
 run_test_exit_contains "-Fu invalid" 64 "not supported" "$MBDISCID" -Fuc
 run_test_exit_contains "-Ao invalid" 64 "not supported" "$MBDISCID" -Aoc
+
+# -----------------------------------------------------------------------------
+echo ""
+echo -e "${YELLOW}=== --assume-audio Validation ===${NC}"
+# -----------------------------------------------------------------------------
+
+# --assume-audio requires both -A and -c
+run_test_exit_contains "--assume-audio without -A" 64 "cli: --assume-audio requires -Ac" "$MBDISCID" --assume-audio -Mc "1 2 3000 150"
+run_test_exit_contains "--assume-audio without -c" 64 "cli: --assume-audio requires -Ac" "$MBDISCID" --assume-audio -A /dev/cdrom
+run_test_exit_contains "--assume-audio with -Fc" 64 "cli: --assume-audio requires -Ac" "$MBDISCID" --assume-audio -Fc "3 150 1000 2000 45"
+
+# --assume-audio with raw TOC produces correct result (using Sublime)
+run_test "--assume-audio produces correct AR ID" "${SUBLIME[ar_id]}" \
+    sh -c "echo '${SUBLIME[raw_toc]}' | '$MBDISCID' -Ac --assume-audio"
+
+# Raw TOC without --assume-audio fails
+run_test_exit_contains "Raw TOC for AR without --assume-audio" 64 "accuraterip: raw TOC not supported" \
+    sh -c "echo '${SUBLIME[raw_toc]}' | '$MBDISCID' -Ac"
+
+# Document that --assume-audio produces WRONG results for mixed mode discs
+# (This is expected behavior - the flag assumes ALL tracks are audio)
+run_test "--assume-audio wrong for mixed mode (expected)" "true" \
+    sh -c "result=\$(echo '${FREEDOM[raw_toc]}' | '$MBDISCID' -Ac --assume-audio 2>/dev/null); [ \"\$result\" != '${FREEDOM[ar_id]}' ] && echo true || echo false"
+
+# -----------------------------------------------------------------------------
+echo ""
+echo -e "${YELLOW}=== Error Message Format ===${NC}"
+# -----------------------------------------------------------------------------
+
+# Verify prefixes are present in error messages
+run_test_exit_contains "cli: prefix on mode error" 64 "cli: modes are mutually exclusive" "$MBDISCID" -MFc
+run_test_exit_contains "cli: prefix on too many args" 64 "cli: too many arguments" "$MBDISCID" arg1 arg2
+run_test_exit_contains "cli: prefix on -c device path" 64 "cli: -c requires TOC data" "$MBDISCID" -c /dev/cdrom
+run_test_exit_contains "toc: prefix on non-numeric" 65 "toc: non-numeric value" sh -c "echo 'abc' | '$MBDISCID' -c"
+run_test_exit_contains "toc: prefix on too few values" 65 "toc: too few values" sh -c "echo '1 2' | '$MBDISCID' -c"
+run_test_exit_contains "toc: prefix on format error" 65 "toc: format not recognized" sh -c "echo '1 2 3 4 5 6 7 8 9' | '$MBDISCID' -c"
+run_test_exit_contains "toc: prefix on negative value" 65 "toc: value cannot be negative" sh -c "echo '1 1 1000 -150' | '$MBDISCID' -Mc"
+run_test_exit_contains "toc: prefix on order error" 65 "toc: offsets not in ascending order" sh -c "echo '1 3 3000 150 1000 500' | '$MBDISCID' -Mc"
+run_test_exit_contains "toc: prefix on leadout error" 65 "toc: leadout before last track" sh -c "echo '1 2 150 1000 500' | '$MBDISCID' -c"
 
 # -----------------------------------------------------------------------------
 echo ""
@@ -547,7 +633,7 @@ echo -e "${YELLOW}=== TOC Input Validation ===${NC}"
 run_test_exit "-c with no data fails" 65 sh -c "echo '' | '$MBDISCID' -c"
 run_test_exit "-c with letters fails" 65 sh -c "echo 'a b c' | '$MBDISCID' -c"
 run_test_exit "-c insufficient data fails" 65 sh -c "echo '1 2' | '$MBDISCID' -c"
-run_test_exit_contains "-c with device path" 64 "expects TOC data" "$MBDISCID" -c /dev/cdrom
+run_test_exit_contains "-c with device path" 64 "cli: -c requires TOC data" "$MBDISCID" -c /dev/cdrom
 run_test_exit "-c negative number fails" 65 sh -c "echo '1 1 1000 -150' | '$MBDISCID' -Mc"
 run_test_exit "Non-monotonic offsets" 65 sh -c "echo '1 3 3000 150 1000 500' | '$MBDISCID' -Mc"
 run_test_exit "Leadout before last" 65 sh -c "echo '1 2 500 150 1000' | '$MBDISCID' -Mc"
