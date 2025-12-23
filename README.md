@@ -90,18 +90,31 @@ mbdiscid -L
 | `-c` | Calculate from TOC data instead of reading disc |
 | `-q` | Quiet mode (suppress error messages) |
 | `-v` | Verbose output (repeat for more: `-vv`, `-vvv`) |
+| `--assume-audio` | Assume all tracks are audio (for `-Ac` with raw TOC) |
 
 ## TOC Input Formats
 
-When using `-c`, the format depends on the mode:
+When using `-c`, mbdiscid accepts several TOC formats. All offset values are 0-based (raw LBA). See [Product Specification §2.11](Product_Specification.md#211-toc-format-definitions) for detailed format definitions.
+
+**Raw TOC** is the simplest format:
+
+```
+first last offset1 ... offsetN leadout
+```
+
+Raw TOC is auto-detected and works directly with `-Mc` and `-Fc`.
+
+**Mode-specific formats:**
 
 | Mode | Format |
 |------|--------|
 | `-Mc` | `first last leadout offset1 ... offsetN` |
-| `-Ac` | `total audio first offset1 ... offsetN leadout` |
-| `-Fc` | `count offset1 ... offsetN total_seconds` |
+| `-Ac` | `track_count audio_count first_audio offset1 ... offsetN leadout` |
+| `-Fc` | `track_count offset1 ... offsetN total_seconds` |
 
-All LBA values are 0-based (raw).
+**Why AccurateRip is different:** AccurateRip IDs are calculated from both total track count and audio-only details, so the AccurateRip TOC format explicitly identifies which tracks are audio (via audio_count and first_audio). The raw TOC format doesn't distinguish between audio and data tracks.
+
+For standard audio CDs where all tracks are audio, `--assume-audio` enables raw TOC input with `-Ac`. This produces incorrect results for Enhanced or Mixed Mode CDs.
 
 ## Platform Notes
 

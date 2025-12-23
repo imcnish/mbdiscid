@@ -310,7 +310,9 @@ All formats include **all tracks** (audio and data) unless otherwise noted. The 
 | `offset1..N` | LBA of each track's starting position (all tracks, in disc order) |
 | `leadout` | LBA of the lead-out |
 
-The Raw TOC is output-only and cannot be supplied via `-c`.
+The Raw TOC format is auto-detected and accepted as input for MusicBrainz (`-Mc`) and FreeDB (`-Fc`) modes.
+
+AccurateRip (`-Ac`) requires the `--assume-audio` modifier to accept raw TOC format. AccurateRip IDs are calculated from both total track count and audio-only details, but raw TOC doesn't distinguish between audio and data tracks. The `--assume-audio` modifier assumes all tracks are audio, which produces incorrect results for Enhanced or Mixed Mode CDs.
 
 ### 2.11.2 AccurateRip TOC Format
 
@@ -468,6 +470,14 @@ Modifiers affect how input is obtained or how errors are presented:
 |----------|-----------|---------|
 | `-c` | `--calculate` | Use TOC input instead of a device |
 | `-q` | `--quiet` | Suppress diagnostic error messages |
+| — | `--assume-audio` | Assume all tracks are audio when using raw TOC with `-Ac` |
+
+The `--assume-audio` modifier:
+
+* Is only valid with `-Ac` (AccurateRip mode with TOC input)
+* Enables raw TOC format input for AccurateRip calculations
+* Assumes all tracks in the TOC are audio tracks
+* **Warning:** Produces incorrect results for Enhanced CDs or Mixed Mode CDs
 
 ---
 
@@ -575,6 +585,10 @@ Examples that must error:
 * `-C -I`
 * `-A -a`
 
+### 3.4.5 `--assume-audio` without `-Ac`
+
+The `--assume-audio` modifier requires both AccurateRip mode (`-A`) and TOC input (`-c`). Using it with any other mode or without `-c` is an error.
+
 ---
 
 ## 3.5 TOC Input
@@ -583,18 +597,43 @@ When supplying TOC data via `-c`, the expected input format depends on the activ
 
 | Mode | Input Format |
 |------|--------------|
-| AccurateRip (`-A`) | AccurateRip TOC |
-| FreeDB (`-F`) | FreeDB TOC |
-| MusicBrainz (`-M`) | MusicBrainz TOC |
+| AccurateRip (`-A`) | AccurateRip TOC (or raw TOC with `--assume-audio`) |
+| FreeDB (`-F`) | FreeDB TOC (or raw TOC, auto-detected) |
+| MusicBrainz (`-M`) | MusicBrainz TOC (or raw TOC, auto-detected) |
 
-If input fails to match the format, mbdiscid exits with `EX_DATAERR`.
+### 3.5.1 Raw TOC Auto-Detection
+
+For MusicBrainz (`-Mc`) and FreeDB (`-Fc`) modes, raw TOC format is automatically detected and accepted. The tool distinguishes between formats based on field positions and value ranges.
+
+### 3.5.2 AccurateRip with Raw TOC
+
+AccurateRip mode (`-Ac`) requires the AccurateRip TOC format by default because it needs explicit audio/data track information. To use raw TOC format with AccurateRip:
+
+1. Specify `--assume-audio`
+2. All tracks will be treated as audio
+3. This is correct only for standard audio CDs (CD-DA)
+
+**Warning:** Using `--assume-audio` with Enhanced CDs or Mixed Mode CDs produces incorrect AccurateRip disc IDs.
+
+If input fails to match the expected format, mbdiscid exits with `EX_DATAERR`.
 
 Example invocations:
 
 ```bash
-mbdiscid -c "1 12 198592 150 17477 ..."
+# MusicBrainz format
+mbdiscid -Mc "1 12 198592 150 17477 ..."
+
+# Raw TOC (auto-detected for -Mc)
+mbdiscid -Mc "1 12 150 17477 ... 198592"
+
+# AccurateRip format
+mbdiscid -Ac "12 12 1 0 17327 ... 198442"
+
+# Raw TOC with --assume-audio for AccurateRip
+mbdiscid -Ac --assume-audio "1 12 150 17477 ... 198592"
+
+# From stdin
 echo "1 12 198592 150 17477 ..." | mbdiscid -c
-mbdiscid -Mc "1 12 198592 150 ..."
 ```
 
 ---
@@ -618,7 +657,7 @@ mbdiscid -Mc "1 12 198592 150 ..."
 
 If `<DEVICE>` is supplied:
 
-* It is interpreted as a direct device path
+* It is interpreted as a literal path to a device node
 * macOS: mbdiscid attempts raw device fallback (see [§8.4](#84-macos-behavior))
 * If the device is not readable, mbdiscid returns an error
 
@@ -722,7 +761,7 @@ Outputs the raw device TOC in single-line textual format (see [§2.11.1](#2111-r
 
 Outputs the AccurateRip-formatted TOC and AccurateRip Disc ID.
 
-**Inputs:** Accepts TOC input (`-c`) using AccurateRip format. If `-c` is not used, the Disc TOC is read and converted.
+**Inputs:** Accepts TOC input (`-c`) using AccurateRip format. Raw TOC format is accepted with `--assume-audio`. If `-c` is not used, the Disc TOC is read and converted.
 
 **Valid actions:** `-t`, `-i`
 
@@ -732,7 +771,7 @@ Outputs the AccurateRip-formatted TOC and AccurateRip Disc ID.
 
 Outputs the FreeDB/CDDB style TOC and FreeDB Disc ID.
 
-**Inputs:** Accepts TOC input (`-c`) using FreeDB format. If `-c` is not used, the Disc TOC is read and converted.
+**Inputs:** Accepts TOC input (`-c`) using FreeDB format or raw TOC format (auto-detected). If `-c` is not used, the Disc TOC is read and converted.
 
 **Valid actions:** `-t`, `-i`
 
@@ -744,7 +783,7 @@ Outputs the FreeDB/CDDB style TOC and FreeDB Disc ID.
 
 Produces the MusicBrainz TOC, MusicBrainz Disc ID, and optional submission URL.
 
-**Inputs:** Accepts TOC input (`-c`) using MusicBrainz format. If `-c` is not used, the Disc TOC is read and converted.
+**Inputs:** Accepts TOC input (`-c`) using MusicBrainz format or raw TOC format (auto-detected). If `-c` is not used, the Disc TOC is read and converted.
 
 **Valid actions:** `-t`, `-i`, `-u`, `-o`
 
@@ -1218,6 +1257,7 @@ The following are not errors:
 * `-a` combined with any other mode flag
 * `-c` used with a mode requiring a physical disc
 * `-u` or `-o` used outside MusicBrainz or All mode
+* `--assume-audio` used without `-Ac`
 * Missing input source (no device, no `-c`, no standalone option)
 * Multiple input sources provided
 * Unknown flags
@@ -1584,7 +1624,7 @@ mbdiscid does not require:
 # 12. Document Metadata
 
 **Title:** mbdiscid Product Specification  
-**Version:** 1.2  
+**Version:** 1.3  
 **Date:** 2025-06-11  
 **Author:** Ian McNish  
 **License:** Creative Commons Attribution 4.0 International (CC BY 4.0)
